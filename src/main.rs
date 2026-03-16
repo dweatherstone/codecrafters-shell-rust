@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::{collections::VecDeque, env, os::unix::fs::PermissionsExt, path::PathBuf};
+use std::{
+    collections::VecDeque, env, os::unix::fs::PermissionsExt, path::PathBuf, process::Command,
+};
 
 fn main() {
     loop {
@@ -34,7 +36,16 @@ fn main() {
                     }
                 }
             }
-            _ => println!("{command}: command not found"),
+            _ => {
+                if let Some(_path) = find_in_path(command) {
+                    Command::new(command)
+                        .args(args)
+                        .output()
+                        .expect("failed to execute process");
+                } else {
+                    println!("{command}: command not found")
+                }
+            }
         }
     }
 }
