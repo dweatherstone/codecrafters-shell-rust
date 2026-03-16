@@ -11,6 +11,10 @@ fn main() {
         io::stdin().read_line(&mut input).unwrap();
         input = input.trim().to_string();
 
+        if input == "exit" {
+            break;
+        }
+
         println!("{input}: command not found");
     }
 }
