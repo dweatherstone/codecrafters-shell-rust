@@ -32,7 +32,9 @@ fn main() {
                             for path in env::split_paths(&paths) {
                                 let full_path = path.join(args[0]);
                                 if full_path.is_file() {
-                                    println!("{} is {:?}", args[0], full_path);
+                                    let output_full_path =
+                                        format!("{:?}", full_path).replace("\"", "");
+                                    println!("{} is {}", args[0], output_full_path);
                                     continue 'outer_loop;
                                 }
                             }
