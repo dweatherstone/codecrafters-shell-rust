@@ -12,5 +12,4 @@ fn main() {
     input = input.trim().to_string();
 
     println!("{input}: command not found");
-    io::stdout().flush().unwrap();
 }
