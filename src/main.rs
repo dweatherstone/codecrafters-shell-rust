@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::{collections::VecDeque, env, path::Path};
+use std::{collections::VecDeque, env};
 
 fn main() {
     loop {
@@ -32,7 +32,7 @@ fn main() {
                             for path in env::split_paths(&paths) {
                                 let full_path = path.join(args[0]);
                                 if full_path.is_file() {
-                                    println!("{} is {:?}", args[0], full_path);
+                                    println!("{} is {}", args[0], full_path.to_str().unwrap());
                                     break;
                                 }
                             }
