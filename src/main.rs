@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::os::unix::process::CommandExt;
 use std::{
     collections::VecDeque, env, os::unix::fs::PermissionsExt, path::PathBuf, process::Command,
 };
@@ -38,13 +39,11 @@ fn main() {
             }
             _ => {
                 if let Some(full_path) = find_in_path(command) {
-                    let status = Command::new(full_path)
+                    let _status = Command::new(&full_path)
+                        .arg0(command)
                         .args(&args)
                         .status()
                         .expect("failed to execute process");
-                    if !status.success() {
-                        println!("{command}: failed to execute successfully");
-                    }
                 } else {
                     println!("{command}: command not found")
                 }
