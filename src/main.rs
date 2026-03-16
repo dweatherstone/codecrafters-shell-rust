@@ -27,7 +27,7 @@ fn main() {
 }
 
 fn handle_type(target: &str) {
-    let builtins = ["exit", "echo", "type"];
+    let builtins = ["exit", "echo", "type", "pwd"];
 
     if builtins.contains(&target) {
         println!("{} is a shell builtin", target);
