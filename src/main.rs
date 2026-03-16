@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::{collections::VecDeque, env};
+use std::{collections::VecDeque, env, os::unix::fs::PermissionsExt};
 
 fn main() {
     loop {
@@ -53,9 +53,14 @@ fn main() {
                         for path in env::split_paths(&path_env) {
                             let full_path = path.join(target);
                             if full_path.is_file() {
-                                println!("{} is {}", target, full_path.display());
-                                found = true;
-                                break;
+                                if let Ok(metadata) = std::fs::metadata(&full_path) {
+                                    let is_executable = metadata.permissions().mode() & 0o111 != 0;
+                                    if is_executable {
+                                        println!("{} is {}", target, full_path.display());
+                                        found = true;
+                                        break;
+                                    }
+                                }
                             }
                         }
                         if !found {
