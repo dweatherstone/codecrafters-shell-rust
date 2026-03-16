@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::{collections::VecDeque, env};
 
 fn main() {
-    'outer_loop: loop {
+    loop {
         print!("$ ");
         io::stdout().flush().unwrap();
 
@@ -20,30 +20,50 @@ fn main() {
 
         match command {
             "exit" => break,
-            "echo" => println!("{}", args.iter().map(|&s| s).collect::<Vec<_>>().join(" ")),
+            "echo" => println!("{}", args.make_contiguous().join(" ")),
             "type" => {
-                if !args.is_empty() && ["exit", "echo", "type"].contains(&args[0]) {
-                    println!("{} is a shell builtin", args[0]);
-                } else if !args.is_empty() {
-                    //println!("{}: not found", args[0]);
-                    let key = "PATH";
-                    match env::var_os(key) {
-                        Some(paths) => {
-                            for path in env::split_paths(&paths) {
-                                let full_path = path.join(args[0]);
-                                if full_path.is_file() {
-                                    let output_full_path =
-                                        format!("{:?}", full_path).replace("\"", "");
-                                    println!("{} is {}", args[0], output_full_path);
-                                    continue 'outer_loop;
-                                }
+                // if !args.is_empty() && ["exit", "echo", "type"].contains(&args[0]) {
+                //     println!("{} is a shell builtin", args[0]);
+                // } else if !args.is_empty() {
+                //     //println!("{}: not found", args[0]);
+                //     let key = "PATH";
+                //     match env::var_os(key) {
+                //         Some(paths) => {
+                //             for path in env::split_paths(&paths) {
+                //                 let full_path = path.join(args[0]);
+                //                 if full_path.is_file() {
+                //                     println!("{} is {}", args[0], full_path.display());
+                //                     continue 'outer_loop;
+                //                 }
+                //             }
+                //             println!("Part 1 {}: not found", args[0]);
+                //         }
+                //         None => println!("Part 2 {}: not found", args[0]),
+                //     }
+                // } else {
+                //     continue;
+                // }
+                if let Some(target) = args.get(0) {
+                    let builtins = ["exit", "echo", "type"];
+
+                    if builtins.contains(target) {
+                        println!("{} is a shell builtin", target);
+                    } else if let Some(path_env) = env::var_os("PATH") {
+                        let mut found = false;
+                        for path in env::split_paths(&path_env) {
+                            let full_path = path.join(target);
+                            if full_path.is_file() {
+                                println!("{} is {}", target, full_path.display());
+                                found = true;
+                                break;
                             }
-                            println!("Part 1 {}: not found", args[0]);
                         }
-                        None => println!("Part 2 {}: not found", args[0]),
+                        if !found {
+                            println!("{}: not found", target);
+                        }
+                    } else {
+                        println!("{}: not found", target);
                     }
-                } else {
-                    continue;
                 }
             }
             _ => println!("{command}: command not found"),
