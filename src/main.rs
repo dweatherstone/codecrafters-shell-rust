@@ -15,8 +15,8 @@ fn main() {
             break;
         } else if input.starts_with("echo") {
             println!("{}", &input[5..]);
+        } else {
+            println!("{input}: command not found");
         }
-
-        println!("{input}: command not found");
     }
 }
