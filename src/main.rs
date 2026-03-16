@@ -1,9 +1,7 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::os::unix::process::CommandExt;
-use std::{
-    collections::VecDeque, env, os::unix::fs::PermissionsExt, path::PathBuf, process::Command,
-};
+use std::{env, os::unix::fs::PermissionsExt, path::PathBuf, process::Command};
 
 fn main() {
     loop {
@@ -13,42 +11,42 @@ fn main() {
         // Read user's input
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
-        input = input.trim().to_string();
 
-        let mut args = input.split_whitespace().collect::<VecDeque<_>>();
-        if args.is_empty() {
-            continue;
-        }
-        let command = args.pop_front().unwrap().trim();
-
-        match command {
-            "exit" => break,
-            "echo" => println!("{}", args.make_contiguous().join(" ")),
-            "type" => {
-                if let Some(target) = args.get(0) {
-                    let builtins = ["exit", "echo", "type"];
-
-                    if builtins.contains(target) {
-                        println!("{} is a shell builtin", target);
-                    } else if let Some(path) = find_in_path(*target) {
-                        println!("{} is {}", target, path.display());
-                    } else {
-                        println!("{}: not found", target);
-                    }
-                }
-            }
-            _ => {
-                if let Some(full_path) = find_in_path(command) {
-                    let _status = Command::new(&full_path)
-                        .arg0(command)
-                        .args(&args)
-                        .status()
-                        .expect("failed to execute process");
-                } else {
-                    println!("{command}: command not found")
+        if let Some(command) = ShellCommand::parse(input.trim()) {
+            match command {
+                ShellCommand::Exit => break,
+                ShellCommand::Echo(args) => println!("{}", args.join(" ")),
+                ShellCommand::Type(target) => handle_type(&target),
+                ShellCommand::External(name, args) => handle_external(&name, &args),
+                ShellCommand::Pwd => {
+                    println!("{}", env::current_dir().unwrap_or_default().display())
                 }
             }
         }
+    }
+}
+
+fn handle_type(target: &str) {
+    let builtins = ["exit", "echo", "type"];
+
+    if builtins.contains(&target) {
+        println!("{} is a shell builtin", target);
+    } else if let Some(path) = find_in_path(target) {
+        println!("{} is {}", target, path.display());
+    } else {
+        println!("{}: not found", target);
+    }
+}
+
+fn handle_external(command: &str, args: &[String]) {
+    if let Some(full_path) = find_in_path(command) {
+        let _status = Command::new(&full_path)
+            .arg0(command)
+            .args(args)
+            .status()
+            .expect("failed to execute process");
+    } else {
+        println!("{command}: command not found")
     }
 }
 
@@ -68,4 +66,28 @@ fn find_in_path(command: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+enum ShellCommand {
+    Exit,
+    Echo(Vec<String>),
+    Type(String),
+    External(String, Vec<String>),
+    Pwd,
+}
+
+impl ShellCommand {
+    fn parse(input: &str) -> Option<Self> {
+        let mut parts = input.split_whitespace();
+        let cmd = parts.next()?;
+        let args: Vec<String> = parts.map(|s| s.trim().to_string()).collect();
+
+        match cmd {
+            "exit" => Some(ShellCommand::Exit),
+            "echo" => Some(ShellCommand::Echo(args)),
+            "type" => Some(ShellCommand::Type(args.get(0).cloned().unwrap_or_default())),
+            "pwd" => Some(ShellCommand::Pwd),
+            _ => Some(ShellCommand::External(cmd.to_string(), args)),
+        }
+    }
 }
