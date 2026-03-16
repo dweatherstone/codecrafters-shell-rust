@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::{collections::VecDeque, env};
 
 fn main() {
-    loop {
+    'outer_loop: loop {
         print!("$ ");
         io::stdout().flush().unwrap();
 
@@ -32,13 +32,13 @@ fn main() {
                             for path in env::split_paths(&paths) {
                                 let full_path = path.join(args[0]);
                                 if full_path.is_file() {
-                                    println!("{} is {}", args[0], full_path.to_str().unwrap());
-                                    break;
+                                    println!("{} is {:?}", args[0], full_path);
+                                    continue 'outer_loop;
                                 }
                             }
-                            println!("{}: not found", args[0]);
+                            println!("Part 1 {}: not found", args[0]);
                         }
-                        None => println!("{}: not found", args[0]),
+                        None => println!("Part 2 {}: not found", args[0]),
                     }
                 } else {
                     continue;
