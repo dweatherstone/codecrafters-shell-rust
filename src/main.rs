@@ -1,9 +1,9 @@
 use std::env;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{self, Write};
 
 use crate::builtins::{handle_cd, handle_echo, handle_type};
-use crate::command::{ParsedCommand, Redirect, ShellCommand};
+use crate::command::{ParsedCommand, Redirect, RedirectMode, ShellCommand};
 use crate::exec::handle_external;
 
 pub mod builtins;
@@ -55,8 +55,20 @@ fn main() {
 
 fn make_stdout_writer(cmd: &ParsedCommand) -> Box<dyn Write> {
     for r in cmd.get_redirects().iter() {
-        if let Redirect::Stdout(path) = r {
-            return Box::new(File::create(path).unwrap());
+        if let Redirect::Stdout(path, mode) = r {
+            let mut open = OpenOptions::new();
+            open.create(true);
+
+            match mode {
+                RedirectMode::Write => {
+                    open.write(true).truncate(true);
+                }
+                RedirectMode::Append => {
+                    open.write(true).append(true);
+                }
+            }
+            let file = open.open(path).unwrap();
+            return Box::new(file);
         }
     }
     Box::new(io::stdout())
@@ -64,8 +76,20 @@ fn make_stdout_writer(cmd: &ParsedCommand) -> Box<dyn Write> {
 
 fn make_stderr_writer(cmd: &ParsedCommand) -> Box<dyn Write> {
     for r in cmd.get_redirects().iter() {
-        if let Redirect::Stderr(path) = r {
-            return Box::new(File::create(path).unwrap());
+        if let Redirect::Stderr(path, mode) = r {
+            let mut open = OpenOptions::new();
+            open.create(true);
+
+            match mode {
+                RedirectMode::Write => {
+                    open.write(true).truncate(true);
+                }
+                RedirectMode::Append => {
+                    open.write(true).append(true);
+                }
+            }
+            let file = open.open(path).unwrap();
+            return Box::new(file);
         }
     }
     Box::new(io::stderr())

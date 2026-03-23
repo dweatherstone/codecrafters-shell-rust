@@ -1,6 +1,9 @@
-use crate::{builtins::find_in_path, command::ParsedCommand, command::Redirect};
+use crate::{
+    builtins::find_in_path,
+    command::{ParsedCommand, Redirect, RedirectMode},
+};
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io,
     os::unix::process::CommandExt,
     process::{Command as ProcessCommand, ExitStatus, Stdio},
@@ -19,12 +22,22 @@ pub fn handle_external(
 
     for r in parsed.get_redirects().iter() {
         match &r {
-            Redirect::Stdout(path) => {
-                let file = File::create(path).unwrap();
+            Redirect::Stdout(path, mode) => {
+                let file = match mode {
+                    RedirectMode::Write => File::create(path)?,
+                    RedirectMode::Append => {
+                        OpenOptions::new().create(true).append(true).open(path)?
+                    }
+                };
                 cmd.stdout(Stdio::from(file));
             }
-            Redirect::Stderr(path) => {
-                let file = File::create(path).unwrap();
+            Redirect::Stderr(path, mode) => {
+                let file = match mode {
+                    RedirectMode::Write => File::create(path)?,
+                    RedirectMode::Append => {
+                        OpenOptions::new().create(true).append(true).open(path)?
+                    }
+                };
                 cmd.stderr(Stdio::from(file));
             }
         }

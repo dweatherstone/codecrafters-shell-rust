@@ -43,8 +43,14 @@ impl ParsedCommand {
 
 #[derive(Debug, Clone)]
 pub enum Redirect {
-    Stdout(PathBuf),
-    Stderr(PathBuf),
+    Stdout(PathBuf, RedirectMode),
+    Stderr(PathBuf, RedirectMode),
+}
+
+#[derive(Debug, Clone)]
+pub enum RedirectMode {
+    Write,  // >
+    Append, // >>
 }
 
 fn extract_redirects(tokens: &mut Vec<String>) -> Vec<Redirect> {
@@ -56,7 +62,15 @@ fn extract_redirects(tokens: &mut Vec<String>) -> Vec<Redirect> {
                 if i + 1 < tokens.len() {
                     let path = PathBuf::from(tokens.remove(i + 1));
                     tokens.remove(i);
-                    redirects.push(Redirect::Stdout(path));
+                    redirects.push(Redirect::Stdout(path, RedirectMode::Write));
+                    continue;
+                }
+            }
+            ">>" | "1>>" => {
+                if i + 1 < tokens.len() {
+                    let path = PathBuf::from(tokens.remove(i + 1));
+                    tokens.remove(i);
+                    redirects.push(Redirect::Stdout(path, RedirectMode::Append));
                     continue;
                 }
             }
@@ -64,7 +78,15 @@ fn extract_redirects(tokens: &mut Vec<String>) -> Vec<Redirect> {
                 if i + 1 < tokens.len() {
                     let path = PathBuf::from(tokens.remove(i + 1));
                     tokens.remove(i);
-                    redirects.push(Redirect::Stderr(path));
+                    redirects.push(Redirect::Stderr(path, RedirectMode::Write));
+                    continue;
+                }
+            }
+            "2>>" => {
+                if i + 1 < tokens.len() {
+                    let path = PathBuf::from(tokens.remove(i + 1));
+                    tokens.remove(i);
+                    redirects.push(Redirect::Stderr(path, RedirectMode::Append));
                     continue;
                 }
             }
