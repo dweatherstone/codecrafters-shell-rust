@@ -1,6 +1,6 @@
-use rustyline::Editor;
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::error::ReadlineError;
+use rustyline::{CompletionType, Config, Editor};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use std::env;
 use std::fs::OpenOptions;
@@ -26,8 +26,11 @@ fn main() {
         ],
         file_completer: FilenameCompleter::new(),
     };
+    let config = Config::builder()
+        .completion_type(CompletionType::List)
+        .build();
 
-    let mut rl = Editor::new().unwrap();
+    let mut rl = Editor::with_config(config).unwrap();
     rl.set_helper(Some(h));
 
     loop {
@@ -144,7 +147,7 @@ impl Completer for ShellHelper {
                 if cmd.starts_with(folder_part) {
                     matches.push(Pair {
                         display: cmd.to_string(),
-                        replacement: format!("{} ", cmd),
+                        replacement: cmd.to_string(),
                     });
                 }
             }
@@ -163,7 +166,7 @@ impl Completer for ShellHelper {
                             if filename.starts_with(folder_part) {
                                 matches.push(Pair {
                                     display: filename.clone(),
-                                    replacement: format!("{} ", filename),
+                                    replacement: filename,
                                 });
                             }
                         }
@@ -174,6 +177,11 @@ impl Completer for ShellHelper {
             // Deduplicate matches
             matches.sort_by(|a, b| a.display.cmp(&b.display));
             matches.dedup_by(|a, b| a.display == b.display);
+
+            // Handle trailing space logic
+            if matches.len() == 1 {
+                matches[0].replacement = format!("{} ", matches[0].display);
+            }
 
             Ok((0, matches))
         } else {
