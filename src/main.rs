@@ -22,13 +22,19 @@ fn main() {
 
         if let Some(command) = ParsedCommand::parse(input.trim()) {
             let mut stdout = make_stdout_writer(&command);
+            let mut stderr = make_stderr_writer(&command);
             match command.kind {
                 ShellCommand::Exit => break,
                 ShellCommand::Echo(args) => {
                     let _ = handle_echo(&args, &mut stdout);
                 }
                 ShellCommand::Type(target) => _ = handle_type(&target, &mut stdout),
-                ShellCommand::External(ref name, ref args) => handle_external(name, args, &command),
+                ShellCommand::External(ref name, ref args) => {
+                    match handle_external(name, args, &command) {
+                        Ok(_) => {}
+                        Err(_) => _ = writeln!(stderr, "{name}: command not found"),
+                    }
+                }
                 ShellCommand::Pwd => {
                     let _ = writeln!(
                         stdout,
@@ -36,7 +42,12 @@ fn main() {
                         env::current_dir().unwrap_or_default().display()
                     );
                 }
-                ShellCommand::Cd(absolute_path) => handle_cd(&absolute_path),
+                ShellCommand::Cd(absolute_path) => match handle_cd(&absolute_path) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        let _ = writeln!(stderr, "{absolute_path}: No such file or directory");
+                    }
+                },
             }
         }
     }
@@ -51,9 +62,9 @@ fn make_stdout_writer(cmd: &ParsedCommand) -> Box<dyn Write> {
     Box::new(io::stdout())
 }
 
-fn _make_stderr_writer(cmd: &ParsedCommand) -> Box<dyn Write> {
+fn make_stderr_writer(cmd: &ParsedCommand) -> Box<dyn Write> {
     for r in cmd.get_redirects().iter() {
-        if let Redirect::_Stderr(path) = r {
+        if let Redirect::Stderr(path) = r {
             return Box::new(File::create(path).unwrap());
         }
     }

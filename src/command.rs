@@ -44,7 +44,7 @@ impl ParsedCommand {
 #[derive(Debug, Clone)]
 pub enum Redirect {
     Stdout(PathBuf),
-    _Stderr(PathBuf),
+    Stderr(PathBuf),
 }
 
 fn extract_redirects(tokens: &mut Vec<String>) -> Vec<Redirect> {
@@ -64,7 +64,7 @@ fn extract_redirects(tokens: &mut Vec<String>) -> Vec<Redirect> {
                 if i + 1 < tokens.len() {
                     let path = PathBuf::from(tokens.remove(i + 1));
                     tokens.remove(i);
-                    redirects.push(Redirect::_Stderr(path));
+                    redirects.push(Redirect::Stderr(path));
                     continue;
                 }
             }

@@ -38,11 +38,14 @@ pub fn find_in_path(command: &str) -> Option<PathBuf> {
     None
 }
 
-pub fn handle_cd(given_path: &str) {
+pub fn handle_cd(given_path: &str) -> io::Result<()> {
     let raw_path = given_path.replace("~", std::env::var("HOME").unwrap().as_str());
     let path = Path::new(&raw_path);
     if !path.exists() {
-        eprintln!("{given_path}: No such file or directory");
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "no such file or directory",
+        ));
     }
-    let _ = env::set_current_dir(path);
+    env::set_current_dir(path)
 }
