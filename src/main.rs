@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::os::unix::process::CommandExt;
+use std::path::Path;
 use std::{env, os::unix::fs::PermissionsExt, path::PathBuf, process::Command};
 
 fn main() {
@@ -21,10 +22,7 @@ fn main() {
                 ShellCommand::Pwd => {
                     println!("{}", env::current_dir().unwrap_or_default().display())
                 }
-                ShellCommand::Cd(absolute_path) => {
-                    env::set_current_dir(PathBuf::from(&absolute_path))
-                        .unwrap_or_else(|_| println!("{absolute_path}: No such file or directory"));
-                }
+                ShellCommand::Cd(absolute_path) => handle_cd(&absolute_path),
             }
         }
     }
@@ -69,6 +67,15 @@ fn find_in_path(command: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+fn handle_cd(given_path: &str) {
+    let raw_path = given_path.replace("~", std::env::var("HOME").unwrap().as_str());
+    let path = Path::new(&raw_path);
+    if !path.exists() {
+        println!("{given_path}: No such file or directory");
+    }
+    let _ = env::set_current_dir(path);
 }
 
 enum ShellCommand {
