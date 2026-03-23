@@ -107,21 +107,38 @@ impl ShellCommand {
     }
 }
 
+enum QuoteState {
+    Normal,
+    InSingleQuote,
+    InDoubleQuote,
+}
+
 fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
-    let mut in_quotes = false;
+    let mut quote_state = QuoteState::Normal;
 
     for ch in input.chars() {
-        match ch {
-            '\'' => in_quotes = !in_quotes,
-            ' ' | '\t' if !in_quotes => {
-                if !current.is_empty() {
-                    tokens.push(current.clone());
-                    current.clear();
+        match quote_state {
+            QuoteState::Normal => match ch {
+                '\'' => quote_state = QuoteState::InSingleQuote,
+                '"' => quote_state = QuoteState::InDoubleQuote,
+                ' ' | '\t' => {
+                    if !current.is_empty() {
+                        tokens.push(current.clone());
+                        current.clear();
+                    }
                 }
-            }
-            _ => current.push(ch),
+                _ => current.push(ch),
+            },
+            QuoteState::InSingleQuote => match ch {
+                '\'' => quote_state = QuoteState::Normal,
+                _ => current.push(ch),
+            },
+            QuoteState::InDoubleQuote => match ch {
+                '"' => quote_state = QuoteState::Normal,
+                _ => current.push(ch),
+            },
         }
     }
 
