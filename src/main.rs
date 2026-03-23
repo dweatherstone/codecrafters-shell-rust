@@ -141,6 +141,14 @@ fn tokenize(input: &str) -> Vec<String> {
                 _ => current.push(ch),
             },
             QuoteState::InDoubleQuote => match ch {
+                '\\' => {
+                    let next_char = input_chars.next().unwrap_or_default();
+                    let escapable_chars = ['"', '\\', '$', '`', '\n'];
+                    if !escapable_chars.contains(&next_char) {
+                        current.push('\\');
+                    }
+                    current.push(next_char);
+                }
                 '"' => quote_state = QuoteState::Normal,
                 _ => current.push(ch),
             },
