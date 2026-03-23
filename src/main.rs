@@ -21,6 +21,10 @@ fn main() {
                 ShellCommand::Pwd => {
                     println!("{}", env::current_dir().unwrap_or_default().display())
                 }
+                ShellCommand::Cd(absolute_path) => {
+                    env::set_current_dir(PathBuf::from(&absolute_path))
+                        .unwrap_or_else(|_| println!("{absolute_path}: No such file or directory"));
+                }
             }
         }
     }
@@ -55,14 +59,13 @@ fn find_in_path(command: &str) -> Option<PathBuf> {
 
     for path in env::split_paths(&path_env) {
         let full_path = path.join(command);
-        if full_path.is_file() {
-            if let Ok(metadata) = std::fs::metadata(&full_path) {
-                // Check if any of the "execute" bits (user, group, or other) are set
-                // 0o111 is octal for --x--x--x
-                if metadata.permissions().mode() & 0o111 != 0 {
-                    return Some(full_path);
-                }
-            }
+        if full_path.is_file()
+            && let Ok(metadata) = std::fs::metadata(&full_path)
+            && metadata.permissions().mode() & 0o111 != 0
+        {
+            // Check if any of the "execute" bits (user, group, or other) are set
+            // 0o111 is octal for --x--x--x
+            return Some(full_path);
         }
     }
     None
@@ -74,6 +77,7 @@ enum ShellCommand {
     Type(String),
     External(String, Vec<String>),
     Pwd,
+    Cd(String),
 }
 
 impl ShellCommand {
@@ -85,8 +89,11 @@ impl ShellCommand {
         match cmd {
             "exit" => Some(ShellCommand::Exit),
             "echo" => Some(ShellCommand::Echo(args)),
-            "type" => Some(ShellCommand::Type(args.get(0).cloned().unwrap_or_default())),
+            "type" => Some(ShellCommand::Type(
+                args.first().cloned().unwrap_or_default(),
+            )),
             "pwd" => Some(ShellCommand::Pwd),
+            "cd" => Some(ShellCommand::Cd(args.first().cloned().unwrap_or_default())),
             _ => Some(ShellCommand::External(cmd.to_string(), args)),
         }
     }
