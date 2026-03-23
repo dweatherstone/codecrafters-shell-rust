@@ -89,11 +89,12 @@ enum ShellCommand {
 
 impl ShellCommand {
     fn parse(input: &str) -> Option<Self> {
-        let mut parts = input.split_whitespace();
+        let tokens = tokenize(input);
+        let mut parts = tokens.into_iter();
         let cmd = parts.next()?;
-        let args: Vec<String> = parts.map(|s| s.trim().to_string()).collect();
+        let args: Vec<String> = parts.collect();
 
-        match cmd {
+        match cmd.as_str() {
             "exit" => Some(ShellCommand::Exit),
             "echo" => Some(ShellCommand::Echo(args)),
             "type" => Some(ShellCommand::Type(
@@ -104,4 +105,29 @@ impl ShellCommand {
             _ => Some(ShellCommand::External(cmd.to_string(), args)),
         }
     }
+}
+
+fn tokenize(input: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    for ch in input.chars() {
+        match ch {
+            '\'' => in_quotes = !in_quotes,
+            ' ' | '\t' if !in_quotes => {
+                if !current.is_empty() {
+                    tokens.push(current.clone());
+                    current.clear();
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
 }
