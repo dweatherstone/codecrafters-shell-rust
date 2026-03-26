@@ -1,12 +1,85 @@
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 
 use crate::tokenizer::tokenize;
 
+pub struct Pipeline {
+    pub commands: Vec<ParsedCommand>,
+}
+
+impl Pipeline {
+    pub fn parse(input: &str) -> Option<Self> {
+        // Check if there is even a pipe in the raw input to save time
+        if !input.contains('|') {
+            // If no pipe, it's just a pipeline with one command
+            return ParsedCommand::parse(input).map(|cmd| Pipeline {
+                commands: vec![cmd],
+            });
+        }
+
+        // Split by the pipe character
+        // but being careful about quotes.
+        let segments: Vec<&str> = input.split('|').collect();
+        let mut commands = Vec::new();
+
+        for segment in segments {
+            if let Some(cmd) = ParsedCommand::parse(segment.trim()) {
+                commands.push(cmd);
+            } else {
+                // If any part of the pipe is invalid, the whole thing fails
+                return None;
+            }
+        }
+
+        Some(Pipeline { commands })
+    }
+
+    pub fn run(&self) {
+        // For now, we just work on 2 commands
+        if self.commands.len() != 2 {
+            return;
+        }
+
+        let cmd1 = &self.commands[0];
+        let cmd2 = &self.commands[1];
+
+        // Prepare command 1
+        if let (ShellCommand::External(program1, args1), ShellCommand::External(program2, args2)) =
+            (&cmd1.kind, &cmd2.kind)
+        {
+            let mut child1 = Command::new(program1)
+                .args(args1)
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("failed to start first command");
+
+            // Capture the output of Command 1
+            // We MUST .take() it so the child no longer "owns" the handle
+            let pipe_reader = child1.stdout.take().expect("failed to open stdout pipe");
+
+            // Prepare and spawn Command 2
+            let mut child2 = Command::new(program2)
+                .args(args2)
+                .stdin(Stdio::from(pipe_reader))
+                .spawn()
+                .expect("failed to start second command");
+
+            // Wait fo both to finish
+            let _ = child1.wait();
+            let _ = child2.wait();
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct ParsedCommand {
     pub kind: ShellCommand,
     redirects: Vec<Redirect>,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ShellCommand {
     Exit,
     Echo(Vec<String>),
@@ -41,13 +114,13 @@ impl ParsedCommand {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Redirect {
     Stdout(PathBuf, RedirectMode),
     Stderr(PathBuf, RedirectMode),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RedirectMode {
     Write,  // >
     Append, // >>
@@ -95,4 +168,23 @@ fn extract_redirects(tokens: &mut Vec<String>) -> Vec<Redirect> {
         i += 1;
     }
     redirects
+}
+
+#[cfg(test)]
+mod command_tests {
+    use super::*;
+
+    #[test]
+    fn parse_tail_f() {
+        let input = "tail -f /tmp/foo";
+        let cmd = ParsedCommand::parse(input);
+        let expected = Some(ParsedCommand {
+            kind: ShellCommand::External(
+                String::from("tail"),
+                vec![String::from("-f"), String::from("/tmp/foo")],
+            ),
+            redirects: Vec::new(),
+        });
+        assert_eq!(cmd, expected);
+    }
 }

@@ -7,7 +7,7 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 
 use crate::builtins::{handle_cd, handle_echo, handle_type};
-use crate::command::{ParsedCommand, Redirect, RedirectMode, ShellCommand};
+use crate::command::{ParsedCommand, Pipeline, Redirect, RedirectMode, ShellCommand};
 use crate::exec::handle_external;
 
 pub mod builtins;
@@ -15,7 +15,7 @@ pub mod command;
 pub mod exec;
 pub mod tokenizer;
 
-fn main() {
+fn main() -> rustyline::Result<()> {
     let h = ShellHelper {
         commands: vec![
             "exit".to_string(),
@@ -46,34 +46,51 @@ fn main() {
             }
         };
 
-        if let Some(command) = ParsedCommand::parse(input.trim()) {
-            let mut stdout = make_stdout_writer(&command);
-            let mut stderr = make_stderr_writer(&command);
-            match command.kind {
-                ShellCommand::Exit => break,
-                ShellCommand::Echo(args) => {
-                    let _ = handle_echo(&args, &mut stdout);
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Parse into a Pipeline
+        if let Some(pipeline) = Pipeline::parse(trimmed) {
+            // Decide how to execute based on command count
+            if pipeline.commands.len() == 1 {
+                let command = pipeline.commands.into_iter().next().unwrap();
+
+                if command.kind == ShellCommand::Exit {
+                    break;
                 }
-                ShellCommand::Type(target) => _ = handle_type(&target, &mut stdout),
-                ShellCommand::External(ref name, ref args) => {
-                    match handle_external(name, args, &command) {
-                        Ok(_) => {}
-                        Err(_) => _ = writeln!(stderr, "{name}: command not found"),
-                    }
-                }
-                ShellCommand::Pwd => {
-                    let _ = writeln!(
-                        stdout,
-                        "{}",
-                        env::current_dir().unwrap_or_default().display()
-                    );
-                }
-                ShellCommand::Cd(absolute_path) => match handle_cd(&absolute_path) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        let _ = writeln!(stderr, "{absolute_path}: No such file or directory");
-                    }
-                },
+                handle_single_command(command);
+            } else {
+                pipeline.run();
+            }
+        }
+    }
+    Ok(())
+}
+
+fn handle_single_command(command: ParsedCommand) {
+    let mut stdout = make_stdout_writer(&command);
+    let mut stderr = make_stderr_writer(&command);
+    match command.kind {
+        ShellCommand::Exit => unreachable!("Exit is handled in main"),
+        ShellCommand::Echo(args) => _ = handle_echo(&args, &mut stdout),
+        ShellCommand::Type(target) => _ = handle_type(&target, &mut stdout),
+        ShellCommand::External(ref name, ref args) => {
+            if handle_external(name, args, &command).is_err() {
+                let _ = writeln!(stderr, "{name}: command not found");
+            }
+        }
+        ShellCommand::Pwd => {
+            let _ = writeln!(
+                stdout,
+                "{}",
+                env::current_dir().unwrap_or_default().display()
+            );
+        }
+        ShellCommand::Cd(absolute_path) => {
+            if handle_cd(&absolute_path).is_err() {
+                let _ = writeln!(stderr, "{absolute_path}: No such file or directory");
             }
         }
     }
