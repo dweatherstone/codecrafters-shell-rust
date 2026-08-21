@@ -50,8 +50,15 @@ pub fn handle_cd(given_path: &str) -> io::Result<()> {
     env::set_current_dir(path)
 }
 
-pub fn handle_history(history: &History, out: &mut dyn Write) -> io::Result<()> {
-    for (idx, command) in history.iter() {
+pub fn handle_history(args: &[String], history: &History, out: &mut dyn Write) -> io::Result<()> {
+    let count = match args.first() {
+        Some(value) => value
+            .parse::<usize>()
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "history: invalid number"))?,
+        None => history.len(),
+    };
+
+    for (idx, command) in history.last(count) {
         writeln!(out, "\t{} {}", idx, command)?;
     }
     Ok(())

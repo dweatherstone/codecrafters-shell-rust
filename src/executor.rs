@@ -215,7 +215,7 @@ fn execute_builtin(
             }
         }
         "history" => {
-            handle_history(history, stdout)?;
+            handle_history(command.args(), history, stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
         _ => match execute_external(command) {
