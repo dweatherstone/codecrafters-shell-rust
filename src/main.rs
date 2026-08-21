@@ -19,7 +19,7 @@ fn main() -> rustyline::Result<()> {
         .completion_type(CompletionType::List)
         .build();
 
-    let mut rl = Editor::with_config(config).unwrap();
+    let mut rl = Editor::with_config(config)?;
     rl.set_helper(Some(h));
 
     let mut history = History::default();
@@ -42,6 +42,7 @@ fn main() -> rustyline::Result<()> {
             continue;
         }
 
+        rl.add_history_entry(trimmed)?;
         history.add(trimmed.to_string());
 
         let tokens = match lexer::lex(trimmed) {
