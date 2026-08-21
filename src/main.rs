@@ -3,11 +3,13 @@ use rustyline::{CompletionType, Config, Editor};
 
 use crate::completion::ShellHelper;
 use crate::executor::ExecutionResult;
+use crate::history::History;
 
 pub mod ast;
 pub mod builtins;
 pub mod completion;
 pub mod executor;
+pub mod history;
 pub mod lexer;
 pub mod parser;
 
@@ -19,6 +21,8 @@ fn main() -> rustyline::Result<()> {
 
     let mut rl = Editor::with_config(config).unwrap();
     rl.set_helper(Some(h));
+
+    let mut history = History::default();
 
     loop {
         let readline = rl.readline("$ ");
@@ -38,6 +42,8 @@ fn main() -> rustyline::Result<()> {
             continue;
         }
 
+        history.add(trimmed.to_string());
+
         let tokens = match lexer::lex(trimmed) {
             Ok(tokens) => tokens,
             Err(error) => {
@@ -54,7 +60,7 @@ fn main() -> rustyline::Result<()> {
             }
         };
 
-        match executor::execute_pipeline(&pipeline) {
+        match executor::execute_pipeline(&pipeline, &history) {
             Ok(ExecutionResult::Exit) => break,
             Ok(ExecutionResult::Continue(_status)) => {}
             Err(error) => eprintln!("execution error: {error}"),

@@ -12,7 +12,8 @@ use nix::{
 
 use crate::{
     ast::{Command, Pipeline, Redirect, RedirectMode},
-    builtins::{find_in_path, handle_cd, handle_echo, handle_type, is_builtin},
+    builtins::{find_in_path, handle_cd, handle_echo, handle_history, handle_type, is_builtin},
+    history::History,
 };
 
 pub enum ExecutionResult {
@@ -25,9 +26,9 @@ enum PipelineChild {
     Builtin(Pid),
 }
 
-pub fn execute_pipeline(pipeline: &Pipeline) -> io::Result<ExecutionResult> {
+pub fn execute_pipeline(pipeline: &Pipeline, history: &History) -> io::Result<ExecutionResult> {
     if pipeline.commands.len() == 1 {
-        return execute_command(&pipeline.commands[0]);
+        return execute_command(&pipeline.commands[0], history);
     }
 
     let mut children = Vec::with_capacity(pipeline.commands.len());
@@ -52,8 +53,13 @@ pub fn execute_pipeline(pipeline: &Pipeline) -> io::Result<ExecutionResult> {
 
         // Builtin
         if is_builtin(program) {
-            let pid = spawn_builtin(command, previous_read.as_ref(), next_write.as_ref())
-                .map_err(io::Error::other)?;
+            let pid = spawn_builtin(
+                command,
+                history,
+                previous_read.as_ref(),
+                next_write.as_ref(),
+            )
+            .map_err(io::Error::other)?;
 
             children.push(PipelineChild::Builtin(pid));
 
@@ -129,15 +135,16 @@ pub fn execute_pipeline(pipeline: &Pipeline) -> io::Result<ExecutionResult> {
     Ok(ExecutionResult::Continue(final_status))
 }
 
-pub fn execute_command(command: &Command) -> io::Result<ExecutionResult> {
+pub fn execute_command(command: &Command, history: &History) -> io::Result<ExecutionResult> {
     let mut stdout = make_stdout_writer(command)?;
     let mut stderr = make_stderr_writer(command)?;
 
-    execute_builtin(command, &mut stdout, &mut stderr)
+    execute_builtin(command, history, &mut stdout, &mut stderr)
 }
 
 fn spawn_builtin(
     command: &Command,
+    history: &History,
     stdin: Option<&OwnedFd>,
     stdout: Option<&OwnedFd>,
 ) -> nix::Result<nix::unistd::Pid> {
@@ -156,7 +163,7 @@ fn spawn_builtin(
             let mut stdout = io::stdout();
             let mut stderr = io::stderr();
 
-            match execute_builtin(command, &mut stdout, &mut stderr) {
+            match execute_builtin(command, history, &mut stdout, &mut stderr) {
                 Ok(ExecutionResult::Continue(status)) => {
                     std::process::exit(status);
                 }
@@ -173,6 +180,7 @@ fn spawn_builtin(
 
 fn execute_builtin(
     command: &Command,
+    history: &History,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
 ) -> io::Result<ExecutionResult> {
@@ -205,6 +213,10 @@ fn execute_builtin(
                     Ok(ExecutionResult::Continue(1))
                 }
             }
+        }
+        "history" => {
+            handle_history(history, stdout)?;
+            Ok(ExecutionResult::Continue(0))
         }
         _ => match execute_external(command) {
             Ok(status) => Ok(ExecutionResult::Continue(status.code().unwrap_or(1))),

@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::history::History;
+
 pub fn handle_echo(args: &[String], out: &mut dyn Write) -> io::Result<()> {
     writeln!(out, "{}", args.join(" "))
 }
@@ -46,6 +48,13 @@ pub fn handle_cd(given_path: &str) -> io::Result<()> {
         ));
     }
     env::set_current_dir(path)
+}
+
+pub fn handle_history(history: &History, out: &mut dyn Write) -> io::Result<()> {
+    for (idx, command) in history.iter() {
+        writeln!(out, "\t{} {}", idx, command)?;
+    }
+    Ok(())
 }
 
 pub fn command_names() -> impl Iterator<Item = &'static str> {
