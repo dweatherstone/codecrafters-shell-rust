@@ -10,7 +10,7 @@ pub fn handle_echo(args: &[String], out: &mut dyn Write) -> io::Result<()> {
 }
 
 pub fn handle_type(target: &str, out: &mut dyn Write) -> io::Result<()> {
-    if command_names().any(|n| n == target) {
+    if is_builtin(target) {
         writeln!(out, "{} is a shell builtin", target)
     } else if let Some(path) = find_in_path(target) {
         writeln!(out, "{} is {}", target, path.display())
@@ -50,4 +50,8 @@ pub fn handle_cd(given_path: &str) -> io::Result<()> {
 
 pub fn command_names() -> impl Iterator<Item = &'static str> {
     ["exit", "echo", "type", "cd", "pwd"].into_iter()
+}
+
+pub fn is_builtin(program: &str) -> bool {
+    command_names().any(|name| name == program)
 }

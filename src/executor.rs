@@ -1,18 +1,28 @@
 use std::{
     fs::{File, OpenOptions},
     io::{self, Write},
-    os::unix::process::CommandExt,
-    process::{Command as ProcessCommand, ExitStatus, Stdio},
+    os::{fd::OwnedFd, unix::process::CommandExt},
+    process::{Child, Command as ProcessCommand, ExitStatus, Stdio},
+};
+
+use nix::{
+    sys::wait::{WaitStatus, waitpid},
+    unistd::{ForkResult, Pid, dup2_stdin, dup2_stdout, fork, pipe},
 };
 
 use crate::{
     ast::{Command, Pipeline, Redirect, RedirectMode},
-    builtins::{find_in_path, handle_cd, handle_echo, handle_type},
+    builtins::{find_in_path, handle_cd, handle_echo, handle_type, is_builtin},
 };
 
 pub enum ExecutionResult {
     Continue(i32),
     Exit,
+}
+
+enum PipelineChild {
+    External(Child),
+    Builtin(Pid),
 }
 
 pub fn execute_pipeline(pipeline: &Pipeline) -> io::Result<ExecutionResult> {
@@ -21,39 +31,98 @@ pub fn execute_pipeline(pipeline: &Pipeline) -> io::Result<ExecutionResult> {
     }
 
     let mut children = Vec::with_capacity(pipeline.commands.len());
-    let mut previous_stdout = None;
+
+    // Read end of the previous pipe
+    let mut previous_read: Option<OwnedFd> = None;
 
     for (index, command) in pipeline.commands.iter().enumerate() {
         let program = command
             .program()
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "empty command"))?;
-        let full_path = find_in_path(program)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "command not found"))?;
-        let mut process = ProcessCommand::new(full_path);
 
-        process.arg0(program).args(command.args());
+        let is_last = index == pipeline.commands.len() - 1;
 
-        if let Some(stdout) = previous_stdout.take() {
-            process.stdin(Stdio::from(stdout));
+        // Create a pipe if this isn't the final command
+        let (next_read, next_write) = if !is_last {
+            let (read, write) = pipe().map_err(io::Error::other)?;
+            (Some(read), Some(write))
+        } else {
+            (None, None)
+        };
+
+        // Builtin
+        if is_builtin(program) {
+            let pid = spawn_builtin(command, previous_read.as_ref(), next_write.as_ref())
+                .map_err(io::Error::other)?;
+
+            children.push(PipelineChild::Builtin(pid));
+
+            // The child now has its own copies of these file descriptors.
+            // The parent doesn't need them anymore.
+            drop(previous_read.take());
+            drop(next_write);
+        }
+        // External command
+        else {
+            let full_path = find_in_path(program).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("{program}: command not found"),
+                )
+            })?;
+
+            let mut process = ProcessCommand::new(full_path);
+
+            process.arg0(program).args(command.args());
+
+            // Connect the previous command's output to this command's stdin
+            if let Some(reader) = previous_read.take() {
+                process.stdin(Stdio::from(reader));
+            }
+
+            // Connect this command's stdout to the next command's stdin.
+            if let Some(writer) = next_write {
+                process.stdout(Stdio::from(writer));
+            }
+
+            apply_external_redirects(&mut process, command)?;
+
+            let child = process.spawn()?;
+
+            children.push(PipelineChild::External(child));
         }
 
-        if index < pipeline.commands.len() - 1 {
-            process.stdout(Stdio::piped());
-        }
-
-        apply_external_redirects(&mut process, command)?;
-        children.push(process.spawn()?);
-
-        if index < pipeline.commands.len() - 1 {
-            previous_stdout = children.last_mut().and_then(|child| child.stdout.take());
-        }
+        // The read end of this command's output pipe
+        // becomes the input to the next command
+        previous_read = next_read;
     }
 
+    // Wait for every process in the pipeline
     let mut final_status = 0;
-    for (index, mut child) in children.into_iter().enumerate() {
-        let status = child.wait()?;
-        if index == pipeline.commands.len() - 1 {
-            final_status = status.code().unwrap_or(1);
+
+    for (index, child) in children.into_iter().enumerate() {
+        let is_final = index == pipeline.commands.len() - 1;
+
+        match child {
+            PipelineChild::External(mut child) => {
+                let status = child.wait()?;
+
+                if is_final {
+                    final_status = status.code().unwrap_or(1);
+                }
+            }
+
+            PipelineChild::Builtin(pid) => {
+                let status = waitpid(pid, None).map_err(io::Error::other)?;
+
+                if is_final {
+                    final_status = match status {
+                        WaitStatus::Exited(_, code) => code,
+                        WaitStatus::Signaled(_, signal, _) => 128 + signal as i32,
+                        _ => 1,
+                    };
+                }
+            }
         }
     }
 
@@ -61,23 +130,66 @@ pub fn execute_pipeline(pipeline: &Pipeline) -> io::Result<ExecutionResult> {
 }
 
 pub fn execute_command(command: &Command) -> io::Result<ExecutionResult> {
+    let mut stdout = make_stdout_writer(command)?;
+    let mut stderr = make_stderr_writer(command)?;
+
+    execute_builtin(command, &mut stdout, &mut stderr)
+}
+
+fn spawn_builtin(
+    command: &Command,
+    stdin: Option<&OwnedFd>,
+    stdout: Option<&OwnedFd>,
+) -> nix::Result<nix::unistd::Pid> {
+    match unsafe { fork()? } {
+        ForkResult::Parent { child } => Ok(child),
+
+        ForkResult::Child => {
+            if let Some(stdin) = stdin {
+                dup2_stdin(stdin)?;
+            }
+
+            if let Some(stdout) = stdout {
+                dup2_stdout(stdout)?;
+            }
+
+            let mut stdout = io::stdout();
+            let mut stderr = io::stderr();
+
+            match execute_builtin(command, &mut stdout, &mut stderr) {
+                Ok(ExecutionResult::Continue(status)) => {
+                    std::process::exit(status);
+                }
+                Ok(ExecutionResult::Exit) => {
+                    std::process::exit(0);
+                }
+                Err(_) => {
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+}
+
+fn execute_builtin(
+    command: &Command,
+    stdout: &mut dyn Write,
+    stderr: &mut dyn Write,
+) -> io::Result<ExecutionResult> {
     let program = match command.program() {
         Some(program) => program,
         None => return Ok(ExecutionResult::Continue(0)),
     };
 
-    let mut stdout = make_stdout_writer(command)?;
-    let mut stderr = make_stderr_writer(command)?;
-
     match program {
         "exit" => Ok(ExecutionResult::Exit),
         "echo" => {
-            handle_echo(command.args(), &mut stdout)?;
+            handle_echo(command.args(), stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
         "type" => {
             let target = command.args().first().map(String::as_str).unwrap_or("");
-            handle_type(target, &mut stdout)?;
+            handle_type(target, stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
         "pwd" => {

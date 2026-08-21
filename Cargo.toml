@@ -8,6 +8,7 @@ rust-version = "1.91"
 [dependencies]
 anyhow = "1.0"                                # error handling
 bytes = "1.11"                                  # helps manage buffers
+nix = { version = "0.31.3", features = ["process", "fs"] }
 rustyline = { version = "18", features = ["derive"] }
 rustyline-derive = "0.12"
 thiserror = "2"                             # error handling
