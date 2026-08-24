@@ -74,7 +74,7 @@ fn main() -> rustyline::Result<()> {
         }
     }
     if let Ok(history_path) = std::env::var("HISTFILE") {
-        history.write_to_file(Path::new(&history_path), false)?;
+        history.write_to_file(Path::new(&history_path))?;
     }
     Ok(())
 }

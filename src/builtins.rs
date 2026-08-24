@@ -72,7 +72,8 @@ pub fn handle_history(
                     "history: file path not provided",
                 )
             })?;
-            history.write_to_file(Path::new(history_path), true)?;
+            history.write_to_file(Path::new(history_path))?;
+            history.mark_appended(PathBuf::from(history_path));
         }
         Some("-a") => {
             let history_path = args.get(1).ok_or_else(|| {
