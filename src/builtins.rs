@@ -1,6 +1,6 @@
 use std::{
     env,
-    fs::{File, read_to_string},
+    fs::File,
     io::{self, Write},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
@@ -64,10 +64,7 @@ pub fn handle_history(
                     "history: file path not provided",
                 )
             })?;
-            let contents = read_to_string(history_path)?;
-            for line in contents.lines() {
-                history.add(line.to_string());
-            }
+            history.load_from_file(Path::new(history_path))?;
         }
         Some("-w") => {
             let history_path = args.get(1).ok_or_else(|| {

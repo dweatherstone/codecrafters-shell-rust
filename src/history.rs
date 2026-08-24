@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fs::OpenOptions,
+    fs::{OpenOptions, read_to_string},
     io::{self, Write},
     path::{Path, PathBuf},
 };
@@ -12,6 +12,16 @@ pub struct History {
 }
 
 impl History {
+    pub fn load_from_file(&mut self, path: &Path) -> io::Result<()> {
+        let contents = read_to_string(path)?;
+
+        for line in contents.lines() {
+            self.add(line.to_string());
+        }
+
+        Ok(())
+    }
+
     pub fn add(&mut self, command: String) {
         self.entries.push(command);
     }

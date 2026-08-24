@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, Editor};
 
@@ -23,6 +25,10 @@ fn main() -> rustyline::Result<()> {
     rl.set_helper(Some(h));
 
     let mut history = History::default();
+
+    if let Ok(history_path) = std::env::var("HISTFILE") {
+        history.load_from_file(Path::new(&history_path))?;
+    }
 
     loop {
         let readline = rl.readline("$ ");
