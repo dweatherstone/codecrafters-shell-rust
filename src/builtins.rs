@@ -1,6 +1,5 @@
 use std::{
     env,
-    fs::File,
     io::{self, Write},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
@@ -73,11 +72,7 @@ pub fn handle_history(
                     "history: file path not provided",
                 )
             })?;
-            let mut history_file = File::create(history_path)?;
-            for (_, line) in history.iter() {
-                writeln!(history_file, "{}", line)?;
-            }
-            history.mark_appended(PathBuf::from(history_path));
+            history.write_to_file(Path::new(history_path), true)?;
         }
         Some("-a") => {
             let history_path = args.get(1).ok_or_else(|| {

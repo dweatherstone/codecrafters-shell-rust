@@ -73,5 +73,8 @@ fn main() -> rustyline::Result<()> {
             Err(error) => eprintln!("execution error: {error}"),
         }
     }
+    if let Ok(history_path) = std::env::var("HISTFILE") {
+        history.write_to_file(Path::new(&history_path), false)?;
+    }
     Ok(())
 }

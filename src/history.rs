@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fs::{OpenOptions, read_to_string},
+    fs::{File, OpenOptions, read_to_string},
     io::{self, Write},
     path::{Path, PathBuf},
 };
@@ -49,6 +49,17 @@ impl History {
             .enumerate()
             .skip(start)
             .map(|(idx, command)| (idx + 1, command.as_str()))
+    }
+
+    pub fn write_to_file(&mut self, path: &Path, do_mark_appended: bool) -> io::Result<()> {
+        let mut history_file = File::create(path)?;
+        for (_, line) in self.iter() {
+            writeln!(history_file, "{}", line)?;
+        }
+        if do_mark_appended {
+            self.mark_appended(PathBuf::from(path));
+        }
+        Ok(())
     }
 
     pub fn append_to_file(&mut self, path: &Path) -> io::Result<()> {
