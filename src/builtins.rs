@@ -1,5 +1,6 @@
 use std::{
     env,
+    fs::read_to_string,
     io::{self, Write},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
@@ -50,16 +51,38 @@ pub fn handle_cd(given_path: &str) -> io::Result<()> {
     env::set_current_dir(path)
 }
 
-pub fn handle_history(args: &[String], history: &History, out: &mut dyn Write) -> io::Result<()> {
-    let count = match args.first() {
-        Some(value) => value
-            .parse::<usize>()
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "history: invalid number"))?,
-        None => history.len(),
-    };
+pub fn handle_history(
+    args: &[String],
+    history: &mut History,
+    out: &mut dyn Write,
+) -> io::Result<()> {
+    match args.first().map(String::as_str) {
+        Some("-r") => {
+            let history_path = args.get(1).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "history: file path not provided",
+                )
+            })?;
+            let contents = read_to_string(history_path)?;
+            for line in contents.lines() {
+                history.add(line.to_string());
+            }
+        }
+        Some(value) => {
+            let count = value.parse::<usize>().map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "history: invalid number")
+            })?;
 
-    for (idx, command) in history.last(count) {
-        writeln!(out, "\t{} {}", idx, command)?;
+            for (idx, command) in history.last(count) {
+                writeln!(out, "\t{} {}", idx, command)?;
+            }
+        }
+        None => {
+            for (idx, command) in history.iter() {
+                writeln!(out, "\t{} {}", idx, command)?;
+            }
+        }
     }
     Ok(())
 }

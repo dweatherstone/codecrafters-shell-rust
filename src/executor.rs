@@ -26,7 +26,7 @@ enum PipelineChild {
     Builtin(Pid),
 }
 
-pub fn execute_pipeline(pipeline: &Pipeline, history: &History) -> io::Result<ExecutionResult> {
+pub fn execute_pipeline(pipeline: &Pipeline, history: &mut History) -> io::Result<ExecutionResult> {
     if pipeline.commands.len() == 1 {
         return execute_command(&pipeline.commands[0], history);
     }
@@ -135,7 +135,7 @@ pub fn execute_pipeline(pipeline: &Pipeline, history: &History) -> io::Result<Ex
     Ok(ExecutionResult::Continue(final_status))
 }
 
-pub fn execute_command(command: &Command, history: &History) -> io::Result<ExecutionResult> {
+pub fn execute_command(command: &Command, history: &mut History) -> io::Result<ExecutionResult> {
     let mut stdout = make_stdout_writer(command)?;
     let mut stderr = make_stderr_writer(command)?;
 
@@ -144,7 +144,7 @@ pub fn execute_command(command: &Command, history: &History) -> io::Result<Execu
 
 fn spawn_builtin(
     command: &Command,
-    history: &History,
+    history: &mut History,
     stdin: Option<&OwnedFd>,
     stdout: Option<&OwnedFd>,
 ) -> nix::Result<nix::unistd::Pid> {
@@ -180,7 +180,7 @@ fn spawn_builtin(
 
 fn execute_builtin(
     command: &Command,
-    history: &History,
+    history: &mut History,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
 ) -> io::Result<ExecutionResult> {
