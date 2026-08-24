@@ -1,6 +1,14 @@
+use std::{
+    collections::HashMap,
+    fs::OpenOptions,
+    io::{self, Write},
+    path::{Path, PathBuf},
+};
+
 #[derive(Default)]
 pub struct History {
     entries: Vec<String>,
+    append_positions: HashMap<PathBuf, usize>,
 }
 
 impl History {
@@ -31,5 +39,23 @@ impl History {
             .enumerate()
             .skip(start)
             .map(|(idx, command)| (idx + 1, command.as_str()))
+    }
+
+    pub fn append_to_file(&mut self, path: &Path) -> io::Result<()> {
+        let start = self.append_positions.get(path).copied().unwrap_or(0);
+
+        let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+
+        for command in self.entries.iter().skip(start) {
+            writeln!(file, "{}", command)?;
+        }
+
+        self.mark_appended(path.to_owned());
+
+        Ok(())
+    }
+
+    pub fn mark_appended(&mut self, path: PathBuf) {
+        self.append_positions.insert(path, self.entries.len());
     }
 }

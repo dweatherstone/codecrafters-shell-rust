@@ -1,6 +1,6 @@
 use std::{
     env,
-    fs::{OpenOptions, read_to_string},
+    fs::{File, read_to_string},
     io::{self, Write},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
@@ -76,16 +76,20 @@ pub fn handle_history(
                     "history: file path not provided",
                 )
             })?;
-            let mut history_file = OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(history_path)
-                .map_err(|_| {
-                    io::Error::new(io::ErrorKind::NotFound, "history: unable to open file")
-                })?;
+            let mut history_file = File::create(history_path)?;
             for (_, line) in history.iter() {
                 writeln!(history_file, "{}", line)?;
             }
+            history.mark_appended(PathBuf::from(history_path));
+        }
+        Some("-a") => {
+            let history_path = args.get(1).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "history: file path not provided",
+                )
+            })?;
+            history.append_to_file(Path::new(history_path))?;
         }
         Some(value) => {
             let count = value.parse::<usize>().map_err(|_| {
