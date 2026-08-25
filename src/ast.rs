@@ -3,6 +3,7 @@ use std::path::PathBuf;
 #[derive(Debug, PartialEq)]
 pub struct Pipeline {
     pub commands: Vec<Command>,
+    pub background: bool,
 }
 
 #[derive(Debug, PartialEq)]

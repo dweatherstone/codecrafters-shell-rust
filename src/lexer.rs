@@ -52,6 +52,10 @@ pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
                     flush_word(&mut tokens, &mut current, &mut word_started);
                     tokens.push(Token::Pipe);
                 }
+                '&' => {
+                    flush_word(&mut tokens, &mut current, &mut word_started);
+                    tokens.push(Token::Background);
+                }
                 ch if ch.is_whitespace() => {
                     flush_word(&mut tokens, &mut current, &mut word_started);
                 }
@@ -109,6 +113,7 @@ pub enum Token {
     Word(String),
     Pipe,
     Redirect { fd: u8, mode: RedirectMode },
+    Background,
 }
 
 enum QuoteState {

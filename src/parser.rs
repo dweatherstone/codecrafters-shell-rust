@@ -16,8 +16,9 @@ pub enum ParseError {
 pub fn parse(tokens: &[Token]) -> Result<Pipeline, ParseError> {
     let mut commands = Vec::new();
     let mut current = Vec::new();
+    let mut background = false;
 
-    for token in tokens {
+    for (index, token) in tokens.iter().enumerate() {
         match token {
             Token::Pipe => {
                 if current.is_empty() {
@@ -26,6 +27,13 @@ pub fn parse(tokens: &[Token]) -> Result<Pipeline, ParseError> {
 
                 commands.push(parse_command(&current)?);
                 current.clear();
+            }
+            Token::Background => {
+                // '&' must be the final token.
+                if index != tokens.len() - 1 {
+                    return Err(ParseError::UnexpectedToken);
+                }
+                background = true;
             }
             token => current.push(token.clone()),
         }
@@ -41,7 +49,10 @@ pub fn parse(tokens: &[Token]) -> Result<Pipeline, ParseError> {
 
     commands.push(parse_command(&current)?);
 
-    Ok(Pipeline { commands })
+    Ok(Pipeline {
+        commands,
+        background,
+    })
 }
 
 fn parse_command(tokens: &[Token]) -> Result<Command, ParseError> {
@@ -69,7 +80,7 @@ fn parse_command(tokens: &[Token]) -> Result<Command, ParseError> {
 
                 index += 2;
             }
-            Token::Pipe => {
+            Token::Pipe | Token::Background => {
                 return Err(ParseError::UnexpectedToken);
             }
         }
@@ -103,6 +114,7 @@ mod parser_tests {
                     words: vec!["tail".into(), "-f".into(), "/tmp/foo".into()],
                     redirects: vec![],
                 }],
+                background: false,
             }
         );
     }
@@ -200,5 +212,31 @@ mod parser_tests {
 
         assert_eq!(pipeline.commands.len(), 1);
         assert_eq!(pipeline.commands[0].words, vec!["echo", "left|right"]);
+    }
+
+    #[test]
+    fn parse_background_command() {
+        let pipeline = parse_input("sleep 500 &").unwrap();
+        assert!(pipeline.background);
+        assert_eq!(pipeline.commands[0].words, vec!["sleep", "500"]);
+    }
+
+    #[test]
+    fn parses_foreground_command_without_background() {
+        let pipeline = parse_input("sleep 500").unwrap();
+        assert!(!pipeline.background);
+        assert_eq!(pipeline.commands[0].words, vec!["sleep", "500"]);
+    }
+
+    #[test]
+    fn rejected_background_token_before_end() {
+        assert_eq!(parse_input("sleep & 500"), Err(ParseError::UnexpectedToken));
+    }
+
+    #[test]
+    fn parses_background_pipeline() {
+        let pipeline = parse_input("echo hello | wc &").unwrap();
+        assert!(pipeline.background);
+        assert_eq!(pipeline.commands.len(), 2);
     }
 }

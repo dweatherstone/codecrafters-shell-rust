@@ -14,6 +14,7 @@ use crate::{
     ast::{Command, Pipeline, Redirect, RedirectMode},
     builtins::{find_in_path, handle_cd, handle_echo, handle_history, handle_type, is_builtin},
     history::History,
+    jobs::Jobs,
 };
 
 pub enum ExecutionResult {
@@ -26,7 +27,16 @@ enum PipelineChild {
     Builtin(Pid),
 }
 
-pub fn execute_pipeline(pipeline: &Pipeline, history: &mut History) -> io::Result<ExecutionResult> {
+pub fn execute_pipeline(
+    pipeline: &Pipeline,
+    history: &mut History,
+    jobs: &mut Jobs,
+) -> io::Result<ExecutionResult> {
+    if pipeline.background {
+        execute_background(pipeline, jobs)?;
+        return Ok(ExecutionResult::Continue(0));
+    }
+
     if pipeline.commands.len() == 1 {
         return execute_command(&pipeline.commands[0], history);
     }
@@ -293,4 +303,37 @@ fn open_redirect_file(redirect: &Redirect) -> io::Result<File> {
             .append(true)
             .open(&redirect.target),
     }
+}
+
+fn execute_background(pipeline: &Pipeline, jobs: &mut Jobs) -> io::Result<()> {
+    let command = pipeline
+        .commands
+        .first()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "empty background command"))?;
+
+    let program = command
+        .program()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "empty command"))?;
+
+    let full_path = find_in_path(program).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("{program}: command not found"),
+        )
+    })?;
+
+    let mut process = ProcessCommand::new(full_path);
+
+    process.arg0(program).args(command.args());
+
+    apply_external_redirects(&mut process, command)?;
+
+    let child = process.spawn()?;
+    let pid = child.id();
+
+    let job_number = jobs.add(child);
+
+    println!("[{}] {}", job_number, pid);
+
+    Ok(())
 }
