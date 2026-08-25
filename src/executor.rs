@@ -150,7 +150,7 @@ pub fn execute_pipeline(
 pub fn execute_command(
     command: &Command,
     history: &mut History,
-    jobs: &Jobs,
+    jobs: &mut Jobs,
 ) -> io::Result<ExecutionResult> {
     let mut stdout = make_stdout_writer(command)?;
     let mut stderr = make_stderr_writer(command)?;
@@ -161,7 +161,7 @@ pub fn execute_command(
 fn spawn_builtin(
     command: &Command,
     history: &mut History,
-    jobs: &Jobs,
+    jobs: &mut Jobs,
     stdin: Option<&OwnedFd>,
     stdout: Option<&OwnedFd>,
 ) -> nix::Result<nix::unistd::Pid> {
@@ -198,7 +198,7 @@ fn spawn_builtin(
 fn execute_builtin(
     command: &Command,
     history: &mut History,
-    jobs: &Jobs,
+    jobs: &mut Jobs,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
 ) -> io::Result<ExecutionResult> {
@@ -346,7 +346,7 @@ fn execute_background(
     let child = process.spawn()?;
     let pid = child.id();
 
-    let job_number = jobs.add(child, command_string.to_string());
+    let job_number = jobs.add(child, command_string);
 
     println!("[{}] {}", job_number, pid);
 
