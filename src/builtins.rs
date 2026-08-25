@@ -103,7 +103,7 @@ pub fn handle_history(
 }
 
 pub fn command_names() -> impl Iterator<Item = &'static str> {
-    ["exit", "echo", "type", "cd", "pwd", "history"].into_iter()
+    ["exit", "echo", "type", "cd", "pwd", "history", "jobs"].into_iter()
 }
 
 pub fn is_builtin(program: &str) -> bool {

@@ -12,6 +12,7 @@ pub mod builtins;
 pub mod completion;
 pub mod executor;
 pub mod history;
+pub mod jobs;
 pub mod lexer;
 pub mod parser;
 

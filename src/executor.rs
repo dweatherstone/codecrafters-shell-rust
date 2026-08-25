@@ -218,6 +218,7 @@ fn execute_builtin(
             handle_history(command.args(), history, stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
+        "jobs" => Ok(ExecutionResult::Continue(0)),
         _ => match execute_external(command) {
             Ok(status) => Ok(ExecutionResult::Continue(status.code().unwrap_or(1))),
             Err(error) => {
