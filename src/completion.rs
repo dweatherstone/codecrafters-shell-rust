@@ -84,10 +84,18 @@ impl Completer for ShellHelper {
             // Filename completion
             let (start_pos, candidates) = self.file_completer.complete(line, pos, ctx)?;
             let updated_candidates: Vec<Pair> = candidates
-                .iter()
-                .map(|candidate| Pair {
-                    display: candidate.display.clone(),
-                    replacement: format!("{} ", candidate.replacement),
+                .into_iter()
+                .map(|candidate| {
+                    let replacement = if candidate.replacement.ends_with('/') {
+                        candidate.replacement
+                    } else {
+                        format!("{} ", candidate.replacement)
+                    };
+
+                    Pair {
+                        display: candidate.display,
+                        replacement,
+                    }
                 })
                 .collect();
             Ok((start_pos, updated_candidates))
