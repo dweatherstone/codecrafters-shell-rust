@@ -28,8 +28,20 @@ impl Jobs {
     }
 
     pub fn list(&self, out: &mut dyn Write) -> io::Result<()> {
-        for job in &self.jobs {
-            writeln!(out, "[{}]+  {:<24} {}", job.number, "Running", job.command)?;
+        let job_count = self.jobs.len();
+        for (index, job) in self.jobs.iter().enumerate() {
+            let marker = if index >= job_count - 1 && index == job_count - 1 {
+                "+"
+            } else if index >= job_count - 2 && index == job_count - 2 {
+                "-"
+            } else {
+                " "
+            };
+            writeln!(
+                out,
+                "[{}]{}  {:<24} {}",
+                job.number, marker, "Running", job.command
+            )?;
         }
         Ok(())
     }
