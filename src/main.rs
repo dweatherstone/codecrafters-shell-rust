@@ -70,7 +70,7 @@ fn main() -> rustyline::Result<()> {
             }
         };
 
-        match executor::execute_pipeline(&pipeline, &mut history, &mut jobs) {
+        match executor::execute_pipeline(&pipeline, &mut history, &mut jobs, trimmed) {
             Ok(ExecutionResult::Exit) => break,
             Ok(ExecutionResult::Continue(_status)) => {}
             Err(error) => eprintln!("execution error: {error}"),

@@ -1,9 +1,12 @@
-use std::process::Child;
+use std::{
+    io::{self, Write},
+    process::Child,
+};
 
 pub struct Job {
     pub number: usize,
-    pub pid: u32,
     pub child: Child,
+    pub command: String,
 }
 
 pub struct Jobs {
@@ -12,16 +15,23 @@ pub struct Jobs {
 }
 
 impl Jobs {
-    pub fn add(&mut self, child: Child) -> usize {
+    pub fn add(&mut self, child: Child, command: String) -> usize {
         let number = self.next_number;
         self.next_number += 1;
 
         self.jobs.push(Job {
             number,
-            pid: child.id(),
             child,
+            command,
         });
         number
+    }
+
+    pub fn list(&self, out: &mut dyn Write) -> io::Result<()> {
+        for job in &self.jobs {
+            writeln!(out, "[{}]+  {:<24} {}", job.number, "Running", job.command)?;
+        }
+        Ok(())
     }
 }
 

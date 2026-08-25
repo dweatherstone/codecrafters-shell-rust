@@ -31,14 +31,15 @@ pub fn execute_pipeline(
     pipeline: &Pipeline,
     history: &mut History,
     jobs: &mut Jobs,
+    command_string: &str,
 ) -> io::Result<ExecutionResult> {
     if pipeline.background {
-        execute_background(pipeline, jobs)?;
+        execute_background(pipeline, jobs, command_string)?;
         return Ok(ExecutionResult::Continue(0));
     }
 
     if pipeline.commands.len() == 1 {
-        return execute_command(&pipeline.commands[0], history);
+        return execute_command(&pipeline.commands[0], history, jobs);
     }
 
     let mut children = Vec::with_capacity(pipeline.commands.len());
@@ -66,6 +67,7 @@ pub fn execute_pipeline(
             let pid = spawn_builtin(
                 command,
                 history,
+                jobs,
                 previous_read.as_ref(),
                 next_write.as_ref(),
             )
@@ -145,16 +147,21 @@ pub fn execute_pipeline(
     Ok(ExecutionResult::Continue(final_status))
 }
 
-pub fn execute_command(command: &Command, history: &mut History) -> io::Result<ExecutionResult> {
+pub fn execute_command(
+    command: &Command,
+    history: &mut History,
+    jobs: &Jobs,
+) -> io::Result<ExecutionResult> {
     let mut stdout = make_stdout_writer(command)?;
     let mut stderr = make_stderr_writer(command)?;
 
-    execute_builtin(command, history, &mut stdout, &mut stderr)
+    execute_builtin(command, history, jobs, &mut stdout, &mut stderr)
 }
 
 fn spawn_builtin(
     command: &Command,
     history: &mut History,
+    jobs: &Jobs,
     stdin: Option<&OwnedFd>,
     stdout: Option<&OwnedFd>,
 ) -> nix::Result<nix::unistd::Pid> {
@@ -173,7 +180,7 @@ fn spawn_builtin(
             let mut stdout = io::stdout();
             let mut stderr = io::stderr();
 
-            match execute_builtin(command, history, &mut stdout, &mut stderr) {
+            match execute_builtin(command, history, jobs, &mut stdout, &mut stderr) {
                 Ok(ExecutionResult::Continue(status)) => {
                     std::process::exit(status);
                 }
@@ -191,6 +198,7 @@ fn spawn_builtin(
 fn execute_builtin(
     command: &Command,
     history: &mut History,
+    jobs: &Jobs,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
 ) -> io::Result<ExecutionResult> {
@@ -228,7 +236,10 @@ fn execute_builtin(
             handle_history(command.args(), history, stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
-        "jobs" => Ok(ExecutionResult::Continue(0)),
+        "jobs" => {
+            jobs.list(stdout)?;
+            Ok(ExecutionResult::Continue(0))
+        }
         _ => match execute_external(command) {
             Ok(status) => Ok(ExecutionResult::Continue(status.code().unwrap_or(1))),
             Err(error) => {
@@ -305,7 +316,11 @@ fn open_redirect_file(redirect: &Redirect) -> io::Result<File> {
     }
 }
 
-fn execute_background(pipeline: &Pipeline, jobs: &mut Jobs) -> io::Result<()> {
+fn execute_background(
+    pipeline: &Pipeline,
+    jobs: &mut Jobs,
+    command_string: &str,
+) -> io::Result<()> {
     let command = pipeline
         .commands
         .first()
@@ -331,7 +346,7 @@ fn execute_background(pipeline: &Pipeline, jobs: &mut Jobs) -> io::Result<()> {
     let child = process.spawn()?;
     let pid = child.id();
 
-    let job_number = jobs.add(child);
+    let job_number = jobs.add(child, command_string.to_string());
 
     println!("[{}] {}", job_number, pid);
 
