@@ -32,15 +32,15 @@ impl Completer for ShellHelper {
         pos: usize,
         ctx: &rustyline::Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
-        let folder_part = &line[..pos];
+        let current_word = &line[..pos];
 
-        if !folder_part.contains(' ') {
+        if !current_word.contains(' ') {
             // Command completion (first word)
             let mut matches = Vec::new();
 
             // Only suggest if we are at the start of the line or typing the first word
             for cmd in &self.commands {
-                if cmd.starts_with(folder_part) {
+                if cmd.starts_with(current_word) {
                     matches.push(Pair {
                         display: cmd.to_string(),
                         replacement: cmd.to_string(),
@@ -59,7 +59,7 @@ impl Completer for ShellHelper {
                         for entry in entries.flatten() {
                             let filename = entry.file_name().to_string_lossy().to_string();
                             // If the filename starts with what the user typed...
-                            if filename.starts_with(folder_part) {
+                            if filename.starts_with(current_word) {
                                 matches.push(Pair {
                                     display: filename.clone(),
                                     replacement: filename,
@@ -86,15 +86,16 @@ impl Completer for ShellHelper {
             let updated_candidates: Vec<Pair> = candidates
                 .into_iter()
                 .map(|candidate| {
-                    let replacement = if candidate.replacement.ends_with('/') {
-                        candidate.replacement
+                    if candidate.replacement.ends_with('/') {
+                        Pair {
+                            replacement: candidate.replacement,
+                            display: format!("{}/", candidate.display),
+                        }
                     } else {
-                        format!("{} ", candidate.replacement)
-                    };
-
-                    Pair {
-                        display: candidate.display,
-                        replacement,
+                        Pair {
+                            replacement: format!("{} ", candidate.replacement),
+                            display: candidate.display,
+                        }
                     }
                 })
                 .collect();
