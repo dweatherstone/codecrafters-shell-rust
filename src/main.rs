@@ -34,6 +34,22 @@ fn main() -> rustyline::Result<()> {
     }
 
     loop {
+        let done_jobs = match jobs.reap() {
+            Ok(jobs) => jobs,
+            Err(error) => {
+                eprintln!("job reap error: {error}");
+                Vec::new()
+            }
+        };
+        for job in done_jobs {
+            println!(
+                "[{}]{}  {:<24} {}",
+                job.number,
+                job.marker.unwrap_or(' '),
+                "Done",
+                job.command
+            );
+        }
         let readline = rl.readline("$ ");
         let input = match readline {
             Ok(line) => line,

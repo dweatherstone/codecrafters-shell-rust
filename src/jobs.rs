@@ -10,6 +10,13 @@ pub struct Job {
     status: JobStatus,
 }
 
+pub struct DisplayJob {
+    pub number: usize,
+    pub command: String,
+    pub marker: Option<char>,
+    status: JobStatus,
+}
+
 pub struct Jobs {
     jobs: Vec<Job>,
     next_number: usize,
@@ -34,11 +41,16 @@ impl Jobs {
     }
 
     pub fn list(&mut self, out: &mut dyn Write) -> io::Result<()> {
-        let job_count = self.jobs.len();
-        for (index, job) in self.jobs.iter_mut().enumerate() {
-            if job.child.try_wait()?.is_some() {
-                job.status = JobStatus::Done;
-            }
+        let mut all_jobs = self.reap()?;
+        all_jobs.extend(self.jobs.iter().map(|job| DisplayJob {
+            number: job.number,
+            command: format!("{} &", job.command),
+            marker: None,
+            status: JobStatus::Running,
+        }));
+        all_jobs.sort_by_key(|job| job.number);
+        let job_count = all_jobs.len();
+        for (index, job) in all_jobs.iter().enumerate() {
             let marker = if index == job_count - 1 {
                 "+"
             } else if index == job_count - 2 {
@@ -50,18 +62,39 @@ impl Jobs {
                 JobStatus::Running => "Running",
                 JobStatus::Done => "Done",
             };
-            let command = match job.status {
-                JobStatus::Running => format!("{} &", job.command),
-                JobStatus::Done => job.command.clone(),
-            };
             writeln!(
                 out,
                 "[{}]{}  {:<24} {}",
-                job.number, marker, status, command
+                job.number, marker, status, job.command
             )?;
         }
-        self.jobs.retain(|job| job.status == JobStatus::Running);
+
         Ok(())
+    }
+
+    pub fn reap(&mut self) -> io::Result<Vec<DisplayJob>> {
+        let mut done_jobs = Vec::new();
+        let job_count = self.jobs.len();
+        for (index, job) in self.jobs.iter_mut().enumerate() {
+            let marker = if index == job_count - 1 {
+                Some('+')
+            } else if index == job_count - 2 {
+                Some('-')
+            } else {
+                None
+            };
+            if job.child.try_wait()?.is_some() {
+                job.status = JobStatus::Done;
+                done_jobs.push(DisplayJob {
+                    number: job.number,
+                    command: job.command.clone(),
+                    marker,
+                    status: JobStatus::Done,
+                });
+            }
+        }
+        self.jobs.retain(|job| job.status == JobStatus::Running);
+        Ok(done_jobs)
     }
 }
 
