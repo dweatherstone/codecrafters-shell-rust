@@ -13,7 +13,7 @@ use nix::{
 use crate::{
     ast::{Command, Pipeline, Redirect, RedirectMode},
     builtins::{find_in_path, handle_cd, handle_echo, handle_type, is_builtin},
-    completion::handle_complete,
+    completion::{CompletionRegistry, handle_complete},
     history::{History, handle_history},
     jobs::Jobs,
 };
@@ -32,6 +32,7 @@ pub fn execute_pipeline(
     pipeline: &Pipeline,
     history: &mut History,
     jobs: &mut Jobs,
+    completions: &mut CompletionRegistry,
     command_string: &str,
 ) -> io::Result<ExecutionResult> {
     if pipeline.background {
@@ -40,7 +41,7 @@ pub fn execute_pipeline(
     }
 
     if pipeline.commands.len() == 1 {
-        return execute_command(&pipeline.commands[0], history, jobs);
+        return execute_command(&pipeline.commands[0], history, jobs, completions);
     }
 
     let mut children = Vec::with_capacity(pipeline.commands.len());
@@ -69,6 +70,7 @@ pub fn execute_pipeline(
                 command,
                 history,
                 jobs,
+                completions,
                 previous_read.as_ref(),
                 next_write.as_ref(),
             )
@@ -152,17 +154,26 @@ pub fn execute_command(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
+    completions: &mut CompletionRegistry,
 ) -> io::Result<ExecutionResult> {
     let mut stdout = make_stdout_writer(command)?;
     let mut stderr = make_stderr_writer(command)?;
 
-    execute_builtin(command, history, jobs, &mut stdout, &mut stderr)
+    execute_builtin(
+        command,
+        history,
+        jobs,
+        completions,
+        &mut stdout,
+        &mut stderr,
+    )
 }
 
 fn spawn_builtin(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
+    completions: &mut CompletionRegistry,
     stdin: Option<&OwnedFd>,
     stdout: Option<&OwnedFd>,
 ) -> nix::Result<nix::unistd::Pid> {
@@ -181,7 +192,14 @@ fn spawn_builtin(
             let mut stdout = io::stdout();
             let mut stderr = io::stderr();
 
-            match execute_builtin(command, history, jobs, &mut stdout, &mut stderr) {
+            match execute_builtin(
+                command,
+                history,
+                jobs,
+                completions,
+                &mut stdout,
+                &mut stderr,
+            ) {
                 Ok(ExecutionResult::Continue(status)) => {
                     std::process::exit(status);
                 }
@@ -200,6 +218,7 @@ fn execute_builtin(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
+    completions: &mut CompletionRegistry,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
 ) -> io::Result<ExecutionResult> {
@@ -242,7 +261,7 @@ fn execute_builtin(
             Ok(ExecutionResult::Continue(0))
         }
         "complete" => {
-            handle_complete(command.args(), stdout)?;
+            handle_complete(command.args(), completions, stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
         _ => match execute_external(command) {

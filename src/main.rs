@@ -3,7 +3,7 @@ use std::path::Path;
 use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, Editor};
 
-use crate::completion::ShellHelper;
+use crate::completion::{CompletionRegistry, ShellHelper};
 use crate::executor::ExecutionResult;
 use crate::history::History;
 use crate::jobs::Jobs;
@@ -28,6 +28,7 @@ fn main() -> rustyline::Result<()> {
 
     let mut history = History::default();
     let mut jobs = Jobs::default();
+    let mut completions = CompletionRegistry::default();
 
     if let Ok(history_path) = std::env::var("HISTFILE") {
         history.load_from_file(Path::new(&history_path))?;
@@ -86,7 +87,13 @@ fn main() -> rustyline::Result<()> {
             }
         };
 
-        match executor::execute_pipeline(&pipeline, &mut history, &mut jobs, trimmed) {
+        match executor::execute_pipeline(
+            &pipeline,
+            &mut history,
+            &mut jobs,
+            &mut completions,
+            trimmed,
+        ) {
             Ok(ExecutionResult::Exit) => break,
             Ok(ExecutionResult::Continue(_status)) => {}
             Err(error) => eprintln!("execution error: {error}"),

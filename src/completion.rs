@@ -1,4 +1,7 @@
-use std::io::{self, Write};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 use rustyline::{
     Helper, Highlighter, Hinter, Validator,
@@ -8,7 +11,6 @@ use rustyline::{
 use crate::builtins;
 
 #[derive(Helper, Hinter, Highlighter, Validator)]
-
 pub struct ShellHelper {
     commands: Vec<String>,
     file_completer: FilenameCompleter,
@@ -106,8 +108,42 @@ impl Completer for ShellHelper {
     }
 }
 
-pub fn handle_complete(args: &[String], out: &mut dyn Write) -> io::Result<()> {
+#[derive(Default)]
+pub struct CompletionRegistry {
+    entries: HashMap<String, String>,
+}
+
+impl CompletionRegistry {
+    fn add(&mut self, command: String, script: String) {
+        self.entries.insert(command, script);
+    }
+
+    fn get(&self, command: &str) -> Option<&String> {
+        self.entries.get(command)
+    }
+}
+
+pub fn handle_complete(
+    args: &[String],
+    completions: &mut CompletionRegistry,
+    out: &mut dyn Write,
+) -> io::Result<()> {
     match args.first().map(String::as_str) {
+        Some("-C") => {
+            let script = args.get(1).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "complete: script path not provided",
+                )
+            })?;
+            let command = args.get(2).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "complete: command not provided",
+                )
+            })?;
+            completions.add(command.into(), script.into());
+        }
         Some("-p") => {
             let command_str = args.get(1).ok_or_else(|| {
                 io::Error::new(
@@ -115,11 +151,18 @@ pub fn handle_complete(args: &[String], out: &mut dyn Write) -> io::Result<()> {
                     "complete: command name not provided",
                 )
             })?;
-            writeln!(
-                out,
-                "complete: {}: no completion specification",
-                command_str
-            )?;
+            match completions.get(command_str) {
+                Some(script) => {
+                    writeln!(out, "complete -C '{}' {}", script, command_str)?;
+                }
+                None => {
+                    writeln!(
+                        out,
+                        "complete: {}: no completion specification",
+                        command_str
+                    )?;
+                }
+            }
         }
         Some(x) => {
             return Err(io::Error::new(
