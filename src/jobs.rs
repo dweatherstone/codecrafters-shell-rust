@@ -17,15 +17,15 @@ pub struct DisplayJob {
     status: JobStatus,
 }
 
+#[derive(Default)]
 pub struct Jobs {
     jobs: Vec<Job>,
-    next_number: usize,
 }
 
 impl Jobs {
     pub fn add(&mut self, child: Child, command_string: &str) -> usize {
-        let number = self.next_number;
-        self.next_number += 1;
+        let number = self.jobs.iter().map(|job| job.number).max().unwrap_or(0) + 1;
+
         let command = command_string
             .strip_suffix(" &")
             .unwrap_or(command_string)
@@ -95,15 +95,6 @@ impl Jobs {
         }
         self.jobs.retain(|job| job.status == JobStatus::Running);
         Ok(done_jobs)
-    }
-}
-
-impl Default for Jobs {
-    fn default() -> Self {
-        Self {
-            jobs: Vec::new(),
-            next_number: 1,
-        }
     }
 }
 
