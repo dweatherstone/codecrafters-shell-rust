@@ -12,8 +12,9 @@ use nix::{
 
 use crate::{
     ast::{Command, Pipeline, Redirect, RedirectMode},
-    builtins::{find_in_path, handle_cd, handle_echo, handle_history, handle_type, is_builtin},
-    history::History,
+    builtins::{find_in_path, handle_cd, handle_echo, handle_type, is_builtin},
+    completion::handle_complete,
+    history::{History, handle_history},
     jobs::Jobs,
 };
 
@@ -238,6 +239,10 @@ fn execute_builtin(
         }
         "jobs" => {
             jobs.list(stdout)?;
+            Ok(ExecutionResult::Continue(0))
+        }
+        "complete" => {
+            handle_complete(command.args(), stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
         _ => match execute_external(command) {

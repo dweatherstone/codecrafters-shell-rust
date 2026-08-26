@@ -5,8 +5,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::history::History;
-
 pub fn handle_echo(args: &[String], out: &mut dyn Write) -> io::Result<()> {
     writeln!(out, "{}", args.join(" "))
 }
@@ -48,58 +46,6 @@ pub fn handle_cd(given_path: &str) -> io::Result<()> {
         ));
     }
     env::set_current_dir(path)
-}
-
-pub fn handle_history(
-    args: &[String],
-    history: &mut History,
-    out: &mut dyn Write,
-) -> io::Result<()> {
-    match args.first().map(String::as_str) {
-        Some("-r") => {
-            let history_path = args.get(1).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "history: file path not provided",
-                )
-            })?;
-            history.load_from_file(Path::new(history_path))?;
-        }
-        Some("-w") => {
-            let history_path = args.get(1).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "history: file path not provided",
-                )
-            })?;
-            history.write_to_file(Path::new(history_path))?;
-            history.mark_appended(PathBuf::from(history_path));
-        }
-        Some("-a") => {
-            let history_path = args.get(1).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "history: file path not provided",
-                )
-            })?;
-            history.append_to_file(Path::new(history_path))?;
-        }
-        Some(value) => {
-            let count = value.parse::<usize>().map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidInput, "history: invalid number")
-            })?;
-
-            for (idx, command) in history.last(count) {
-                writeln!(out, "\t{} {}", idx, command)?;
-            }
-        }
-        None => {
-            for (idx, command) in history.iter() {
-                writeln!(out, "\t{} {}", idx, command)?;
-            }
-        }
-    }
-    Ok(())
 }
 
 pub fn command_names() -> impl Iterator<Item = &'static str> {

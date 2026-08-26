@@ -1,3 +1,5 @@
+use std::io::{self, Write};
+
 use rustyline::{
     Helper, Highlighter, Hinter, Validator,
     completion::{Completer, FilenameCompleter, Pair},
@@ -102,4 +104,36 @@ impl Completer for ShellHelper {
             Ok((start_pos, updated_candidates))
         }
     }
+}
+
+pub fn handle_complete(args: &[String], out: &mut dyn Write) -> io::Result<()> {
+    match args.first().map(String::as_str) {
+        Some("-p") => {
+            let command_str = args.get(1).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "complete: command name not provided",
+                )
+            })?;
+            writeln!(
+                out,
+                "complete: {}: no completion specification",
+                command_str
+            )?;
+        }
+        Some(x) => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("complete: unknown argument: {}", x),
+            ));
+        }
+        None => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "complete command requires arguments",
+            ));
+        }
+    }
+
+    Ok(())
 }
