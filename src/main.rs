@@ -1,9 +1,12 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::Path;
+use std::rc::Rc;
 
 use rustyline::error::ReadlineError;
 use rustyline::{CompletionType, Config, Editor};
 
-use crate::completion::{CompletionRegistry, ShellHelper};
+use crate::completion::ShellHelper;
 use crate::executor::ExecutionResult;
 use crate::history::History;
 use crate::jobs::Jobs;
@@ -18,7 +21,8 @@ pub mod lexer;
 pub mod parser;
 
 fn main() -> rustyline::Result<()> {
-    let h = ShellHelper::default();
+    let completions = Rc::new(RefCell::new(HashMap::new()));
+    let h = ShellHelper::new(Rc::clone(&completions));
     let config = Config::builder()
         .completion_type(CompletionType::List)
         .build();
@@ -28,7 +32,6 @@ fn main() -> rustyline::Result<()> {
 
     let mut history = History::default();
     let mut jobs = Jobs::default();
-    let mut completions = CompletionRegistry::default();
 
     if let Ok(history_path) = std::env::var("HISTFILE") {
         history.load_from_file(Path::new(&history_path))?;
@@ -87,13 +90,8 @@ fn main() -> rustyline::Result<()> {
             }
         };
 
-        match executor::execute_pipeline(
-            &pipeline,
-            &mut history,
-            &mut jobs,
-            &mut completions,
-            trimmed,
-        ) {
+        match executor::execute_pipeline(&pipeline, &mut history, &mut jobs, &completions, trimmed)
+        {
             Ok(ExecutionResult::Exit) => break,
             Ok(ExecutionResult::Continue(_status)) => {}
             Err(error) => eprintln!("execution error: {error}"),

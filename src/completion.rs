@@ -1,6 +1,8 @@
 use std::{
+    cell::RefCell,
     collections::HashMap,
     io::{self, Write},
+    rc::Rc,
 };
 
 use rustyline::{
@@ -10,19 +12,22 @@ use rustyline::{
 
 use crate::builtins;
 
+pub type CompletionRegistry = Rc<RefCell<HashMap<String, String>>>;
+
 #[derive(Helper, Hinter, Highlighter, Validator)]
 pub struct ShellHelper {
     commands: Vec<String>,
     file_completer: FilenameCompleter,
+    completions: CompletionRegistry,
 }
-
-impl Default for ShellHelper {
-    fn default() -> Self {
+impl ShellHelper {
+    pub fn new(completions: CompletionRegistry) -> Self {
         let commands = builtins::command_names().map(|n| n.to_string()).collect();
 
         ShellHelper {
             commands,
             file_completer: FilenameCompleter::new(),
+            completions,
         }
     }
 }
@@ -36,6 +41,25 @@ impl Completer for ShellHelper {
         pos: usize,
         ctx: &rustyline::Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
+        // Do we have a registered completer?
+        let completions = self.completions.borrow();
+        if let Some(command) = command_name(line)
+            && let Some(completer) = completions.get(command)
+        {
+            let output = std::process::Command::new(completer)
+                .output()
+                .map_err(|_| {
+                    rustyline::error::ReadlineError::Io(io::Error::other("failed to run completer"))
+                })?;
+            let candidate = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            return Ok((
+                pos,
+                vec![Pair {
+                    display: candidate.clone(),
+                    replacement: format!("{} ", candidate),
+                }],
+            ));
+        }
         let current_word = &line[..pos];
 
         if !current_word.contains(' ') {
@@ -108,24 +132,9 @@ impl Completer for ShellHelper {
     }
 }
 
-#[derive(Default)]
-pub struct CompletionRegistry {
-    entries: HashMap<String, String>,
-}
-
-impl CompletionRegistry {
-    fn add(&mut self, command: String, script: String) {
-        self.entries.insert(command, script);
-    }
-
-    fn get(&self, command: &str) -> Option<&String> {
-        self.entries.get(command)
-    }
-}
-
 pub fn handle_complete(
     args: &[String],
-    completions: &mut CompletionRegistry,
+    completions: &CompletionRegistry,
     out: &mut dyn Write,
 ) -> io::Result<()> {
     match args.first().map(String::as_str) {
@@ -142,7 +151,9 @@ pub fn handle_complete(
                     "complete: command not provided",
                 )
             })?;
-            completions.add(command.into(), script.into());
+            completions
+                .borrow_mut()
+                .insert(command.into(), script.into());
         }
         Some("-p") => {
             let command_str = args.get(1).ok_or_else(|| {
@@ -151,7 +162,7 @@ pub fn handle_complete(
                     "complete: command name not provided",
                 )
             })?;
-            match completions.get(command_str) {
+            match completions.borrow().get(command_str) {
                 Some(script) => {
                     writeln!(out, "complete -C '{}' {}", script, command_str)?;
                 }
@@ -179,4 +190,8 @@ pub fn handle_complete(
     }
 
     Ok(())
+}
+
+fn command_name(line: &str) -> Option<&str> {
+    line.split_whitespace().next()
 }

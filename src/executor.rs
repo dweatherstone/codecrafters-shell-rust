@@ -32,7 +32,7 @@ pub fn execute_pipeline(
     pipeline: &Pipeline,
     history: &mut History,
     jobs: &mut Jobs,
-    completions: &mut CompletionRegistry,
+    completions: &CompletionRegistry,
     command_string: &str,
 ) -> io::Result<ExecutionResult> {
     if pipeline.background {
@@ -154,7 +154,7 @@ pub fn execute_command(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
-    completions: &mut CompletionRegistry,
+    completions: &CompletionRegistry,
 ) -> io::Result<ExecutionResult> {
     let mut stdout = make_stdout_writer(command)?;
     let mut stderr = make_stderr_writer(command)?;
@@ -173,7 +173,7 @@ fn spawn_builtin(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
-    completions: &mut CompletionRegistry,
+    completions: &CompletionRegistry,
     stdin: Option<&OwnedFd>,
     stdout: Option<&OwnedFd>,
 ) -> nix::Result<nix::unistd::Pid> {
@@ -218,7 +218,7 @@ fn execute_builtin(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
-    completions: &mut CompletionRegistry,
+    completions: &CompletionRegistry,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
 ) -> io::Result<ExecutionResult> {
