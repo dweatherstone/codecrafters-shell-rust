@@ -55,6 +55,8 @@ impl Completer for ShellHelper {
                 .unwrap_or("");
             let args = [command, current_word, previous_word];
             let output = std::process::Command::new(completer)
+                .env("COMP_LINE", line)
+                .env("COMP_POINT", pos.to_string())
                 .args(args)
                 .output()
                 .map_err(|_| {
