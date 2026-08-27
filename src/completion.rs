@@ -221,6 +221,15 @@ pub fn handle_complete(
                 }
             }
         }
+        Some("-r") => {
+            let command_str = args.get(1).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "complete: command name not provided",
+                )
+            })?;
+            completions.borrow_mut().remove(command_str);
+        }
         Some(x) => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
