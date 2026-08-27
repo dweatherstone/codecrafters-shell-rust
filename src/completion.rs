@@ -46,7 +46,16 @@ impl Completer for ShellHelper {
         if let Some(command) = command_name(line)
             && let Some(completer) = completions.get(command)
         {
+            let words: Vec<&str> = line[..pos].split_whitespace().collect();
+            let command = words.first().copied().unwrap_or("");
+            let current_word = words.last().copied().unwrap_or("");
+            let previous_word = words
+                .get(words.len().saturating_sub(2))
+                .copied()
+                .unwrap_or("");
+            let args = [command, current_word, previous_word];
             let output = std::process::Command::new(completer)
+                .args(args)
                 .output()
                 .map_err(|_| {
                     rustyline::error::ReadlineError::Io(io::Error::other("failed to run completer"))
@@ -58,8 +67,12 @@ impl Completer for ShellHelper {
                 return Ok((pos, Vec::new()));
             }
             let candidate = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let start_pos = line[..pos]
+                .rfind(char::is_whitespace)
+                .map(|index| index + 1)
+                .unwrap_or(0);
             return Ok((
-                pos,
+                start_pos,
                 vec![Pair {
                     display: candidate.clone(),
                     replacement: format!("{} ", candidate),
