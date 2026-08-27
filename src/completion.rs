@@ -68,18 +68,23 @@ impl Completer for ShellHelper {
                 println!("\x07");
                 return Ok((pos, Vec::new()));
             }
-            let candidate = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+            let mut candidates = String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .map(|candidate| Pair {
+                    display: candidate.to_string(),
+                    replacement: format!("{} ", candidate),
+                })
+                .collect::<Vec<_>>();
+            candidates.sort_by(|a, b| a.display.cmp(&b.display));
+
             let start_pos = line[..pos]
                 .rfind(char::is_whitespace)
                 .map(|index| index + 1)
                 .unwrap_or(0);
-            return Ok((
-                start_pos,
-                vec![Pair {
-                    display: candidate.clone(),
-                    replacement: format!("{} ", candidate),
-                }],
-            ));
+            return Ok((start_pos, candidates));
         }
         let current_word = &line[..pos];
 
