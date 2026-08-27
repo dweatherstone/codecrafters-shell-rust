@@ -51,6 +51,12 @@ impl Completer for ShellHelper {
                 .map_err(|_| {
                     rustyline::error::ReadlineError::Io(io::Error::other("failed to run completer"))
                 })?;
+            // If completer script does not print anything, then we have no candidates
+            if output.stdout.is_empty() {
+                // Print bell sound
+                println!("\x07");
+                return Ok((pos, Vec::new()));
+            }
             let candidate = String::from_utf8_lossy(&output.stdout).trim().to_string();
             return Ok((
                 pos,
