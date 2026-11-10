@@ -28,6 +28,9 @@ pub fn handle_declare(
                     "declare: new variable must have value",
                 )
             })?;
+            if !is_variable_name_valid(variable_name)? {
+                return writeln!(out, "declare: `{}': not a valid identifier", arg);
+            }
             variables.insert(variable_name.to_string(), value.to_string());
             Ok(())
         }
@@ -36,4 +39,26 @@ pub fn handle_declare(
             "declare: no flag provided",
         )),
     }
+}
+
+fn is_variable_name_valid(variable_name: &str) -> io::Result<bool> {
+    let mut chars = variable_name.chars();
+    if chars
+        .next()
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "declare: variable name cannot be empty",
+            )
+        })?
+        .is_ascii_digit()
+    {
+        return Ok(false);
+    }
+    for ch in chars {
+        if !ch.is_alphanumeric() && ch != '_' {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
