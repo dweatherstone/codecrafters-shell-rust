@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::{File, OpenOptions},
     io::{self, Write},
     os::{fd::OwnedFd, unix::process::CommandExt},
@@ -33,6 +34,7 @@ pub fn execute_pipeline(
     pipeline: &Pipeline,
     history: &mut History,
     jobs: &mut Jobs,
+    variables: &mut HashMap<String, String>,
     completions: &CompletionRegistry,
     command_string: &str,
 ) -> io::Result<ExecutionResult> {
@@ -42,7 +44,7 @@ pub fn execute_pipeline(
     }
 
     if pipeline.commands.len() == 1 {
-        return execute_command(&pipeline.commands[0], history, jobs, completions);
+        return execute_command(&pipeline.commands[0], history, jobs, variables, completions);
     }
 
     let mut children = Vec::with_capacity(pipeline.commands.len());
@@ -71,6 +73,7 @@ pub fn execute_pipeline(
                 command,
                 history,
                 jobs,
+                variables,
                 completions,
                 previous_read.as_ref(),
                 next_write.as_ref(),
@@ -155,6 +158,7 @@ pub fn execute_command(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
+    variables: &mut HashMap<String, String>,
     completions: &CompletionRegistry,
 ) -> io::Result<ExecutionResult> {
     let mut stdout = make_stdout_writer(command)?;
@@ -164,6 +168,7 @@ pub fn execute_command(
         command,
         history,
         jobs,
+        variables,
         completions,
         &mut stdout,
         &mut stderr,
@@ -174,6 +179,7 @@ fn spawn_builtin(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
+    variables: &mut HashMap<String, String>,
     completions: &CompletionRegistry,
     stdin: Option<&OwnedFd>,
     stdout: Option<&OwnedFd>,
@@ -197,6 +203,7 @@ fn spawn_builtin(
                 command,
                 history,
                 jobs,
+                variables,
                 completions,
                 &mut stdout,
                 &mut stderr,
@@ -219,6 +226,7 @@ fn execute_builtin(
     command: &Command,
     history: &mut History,
     jobs: &mut Jobs,
+    variables: &mut HashMap<String, String>,
     completions: &CompletionRegistry,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
@@ -266,7 +274,7 @@ fn execute_builtin(
             Ok(ExecutionResult::Continue(0))
         }
         "declare" => {
-            handle_declare(command.args(), stdout)?;
+            handle_declare(command.args(), variables, stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
         _ => match execute_external(command) {

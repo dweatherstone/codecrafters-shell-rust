@@ -33,6 +33,7 @@ fn main() -> rustyline::Result<()> {
 
     let mut history = History::default();
     let mut jobs = Jobs::default();
+    let mut variables = HashMap::new();
 
     if let Ok(history_path) = std::env::var("HISTFILE") {
         history.load_from_file(Path::new(&history_path))?;
@@ -91,8 +92,14 @@ fn main() -> rustyline::Result<()> {
             }
         };
 
-        match executor::execute_pipeline(&pipeline, &mut history, &mut jobs, &completions, trimmed)
-        {
+        match executor::execute_pipeline(
+            &pipeline,
+            &mut history,
+            &mut jobs,
+            &mut variables,
+            &completions,
+            trimmed,
+        ) {
             Ok(ExecutionResult::Exit) => break,
             Ok(ExecutionResult::Continue(_status)) => {}
             Err(error) => eprintln!("execution error: {error}"),
