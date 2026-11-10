@@ -50,7 +50,7 @@ pub fn handle_cd(given_path: &str) -> io::Result<()> {
 
 pub fn command_names() -> impl Iterator<Item = &'static str> {
     [
-        "exit", "echo", "type", "cd", "pwd", "history", "jobs", "complete",
+        "exit", "echo", "type", "cd", "pwd", "history", "jobs", "complete", "declare",
     ]
     .into_iter()
 }
