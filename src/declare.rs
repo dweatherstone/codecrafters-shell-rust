@@ -28,7 +28,7 @@ pub fn handle_declare(
                     "declare: new variable must have value",
                 )
             })?;
-            if !is_variable_name_valid(variable_name)? {
+            if !is_variable_name_valid(variable_name) {
                 return writeln!(out, "declare: `{}': not a valid identifier", arg);
             }
             variables.insert(variable_name.to_string(), value.to_string());
@@ -41,24 +41,21 @@ pub fn handle_declare(
     }
 }
 
-fn is_variable_name_valid(variable_name: &str) -> io::Result<bool> {
-    let mut chars = variable_name.chars();
-    if chars
-        .next()
-        .ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "declare: variable name cannot be empty",
-            )
-        })?
-        .is_ascii_digit()
-    {
-        return Ok(false);
+pub(crate) fn is_variable_name_start(ch: char) -> bool {
+    ch.is_ascii_alphabetic() || ch == '_'
+}
+
+pub(crate) fn is_variable_name_continue(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_'
+}
+
+fn is_variable_name_valid(name: &str) -> bool {
+    let mut chars = name.chars();
+
+    match chars.next() {
+        Some(first) if is_variable_name_start(first) => {}
+        _ => return false,
     }
-    for ch in chars {
-        if !ch.is_alphanumeric() && ch != '_' {
-            return Ok(false);
-        }
-    }
-    Ok(true)
+
+    chars.all(is_variable_name_continue)
 }
