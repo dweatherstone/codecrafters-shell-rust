@@ -14,6 +14,7 @@ use crate::jobs::Jobs;
 pub mod ast;
 pub mod builtins;
 pub mod completion;
+pub mod declare;
 pub mod executor;
 pub mod history;
 pub mod jobs;

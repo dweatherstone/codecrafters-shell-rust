@@ -14,6 +14,7 @@ use crate::{
     ast::{Command, Pipeline, Redirect, RedirectMode},
     builtins::{find_in_path, handle_cd, handle_echo, handle_type, is_builtin},
     completion::{CompletionRegistry, handle_complete},
+    declare::handle_declare,
     history::{History, handle_history},
     jobs::Jobs,
 };
@@ -262,6 +263,10 @@ fn execute_builtin(
         }
         "complete" => {
             handle_complete(command.args(), completions, stdout)?;
+            Ok(ExecutionResult::Continue(0))
+        }
+        "declare" => {
+            handle_declare(command.args(), stdout)?;
             Ok(ExecutionResult::Continue(0))
         }
         _ => match execute_external(command) {
