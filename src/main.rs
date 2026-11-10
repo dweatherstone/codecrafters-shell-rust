@@ -20,6 +20,7 @@ pub mod history;
 pub mod jobs;
 pub mod lexer;
 pub mod parser;
+pub mod variables;
 
 fn main() -> rustyline::Result<()> {
     let completions = Rc::new(RefCell::new(HashMap::new()));
@@ -94,7 +95,7 @@ fn main() -> rustyline::Result<()> {
 
         for command in &mut pipeline.commands {
             for word in &mut command.words {
-                *word = expand_variables(word, &variables);
+                *word = variables::expand_word(word, &variables);
             }
         }
 
@@ -115,41 +116,4 @@ fn main() -> rustyline::Result<()> {
         history.write_to_file(Path::new(&history_path))?;
     }
     Ok(())
-}
-
-fn expand_variables(word: &str, variables: &HashMap<String, String>) -> String {
-    use crate::declare::{is_variable_name_continue, is_variable_name_start};
-
-    let mut chars = word.chars().peekable();
-    let mut expanded = String::new();
-
-    while let Some(ch) = chars.next() {
-        if ch != '$' {
-            expanded.push(ch);
-            continue;
-        }
-
-        if !chars
-            .peek()
-            .is_some_and(|&next| is_variable_name_start(next))
-        {
-            expanded.push('$');
-            continue;
-        }
-
-        let mut name = String::new();
-        while let Some(&next) = chars.peek() {
-            if !is_variable_name_continue(next) {
-                break;
-            }
-            name.push(chars.next().expect("character was just peeked"));
-        }
-
-        if let Some(value) = variables.get(&name) {
-            expanded.push_str(value);
-        }
-        // An unset variable contributes an empty string.
-    }
-
-    expanded
 }

@@ -3,6 +3,8 @@ use std::{
     io::{self, Write},
 };
 
+use crate::variables::{is_variable_name_continue, is_variable_name_start};
+
 pub fn handle_declare(
     args: &[String],
     variables: &mut HashMap<String, String>,
@@ -39,14 +41,6 @@ pub fn handle_declare(
             "declare: no flag provided",
         )),
     }
-}
-
-pub(crate) fn is_variable_name_start(ch: char) -> bool {
-    ch.is_ascii_alphabetic() || ch == '_'
-}
-
-pub(crate) fn is_variable_name_continue(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || ch == '_'
 }
 
 fn is_variable_name_valid(name: &str) -> bool {
