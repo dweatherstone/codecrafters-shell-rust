@@ -97,6 +97,7 @@ fn main() -> rustyline::Result<()> {
             for word in &mut command.words {
                 *word = variables::expand_word(word, &variables);
             }
+            command.words.retain(|word| !word.is_empty());
         }
 
         match executor::execute_pipeline(
